@@ -1,0 +1,55 @@
+{
+  "name": "PZEM-004T",
+  "author": "Michael",
+  "pins": ["VCC", "GND", "TX", "RX"],
+  "controls": [
+    {
+      "id": "voltage",
+      "label": "Voltage (V)",
+      "type": "range",
+      "min": 80,
+      "max": 260,
+      "step": 0.1
+    },
+    {
+      "id": "current",
+      "label": "Current (A)",
+      "type": "range",
+      "min": 0,
+      "max": 10,
+      "step": 0.001
+    },
+    {
+      "id": "power",
+      "label": "Power (W)",
+      "type": "range",
+      "min": 0,
+      "max": 2300,
+      "step": 0.1
+    },
+    {
+      "id": "energy",
+      "label": "Energy (Wh)",
+      "type": "range",
+      "min": 0,
+      "max": 9999,
+      "step": 1
+    },
+    {
+      "id": "frequency",
+      "label": "Frequency (Hz)",
+      "type": "range",
+      "min": 45,
+      "max": 65,
+      "step": 0.1
+    },
+    {
+      "id": "pf",
+      "label": "Power Factor",
+      "type": "range",
+      "min": 0,
+      "max": 1,
+      "step": 0.01
+    }
+  ]
+}

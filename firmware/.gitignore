@@ -1,0 +1,9 @@
+build/
+sdkconfig
+sdkconfig.old
+managed_components/
+
+# My rubbish files
+/main/old_code.txt
+/main/old-no-relay.txt
+blah.txt

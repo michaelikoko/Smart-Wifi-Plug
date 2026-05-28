@@ -1,0 +1,8 @@
+[wokwi]
+version = 1
+elf = "build/pzem004t_demo.elf"
+firmware = "build/pzem004t_demo.bin"
+
+[[chip]]
+name = "pzem004t"
+binary = "pzem004t.chip.wasm"
