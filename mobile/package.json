@@ -1,0 +1,69 @@
+{
+  "name": "mobile",
+  "main": "expo-router/entry",
+  "version": "1.0.0",
+  "dependencies": {
+    "@expo/html-elements": "^0.12.5",
+    "@expo/ui": "~56.0.15",
+    "@gluestack-ui/core": "^5.0.0-alpha.0",
+    "@gluestack-ui/utils": "^5.0.1-alpha.0",
+    "@legendapp/motion": "^2.5.3",
+    "@react-aria/ssr": "^3.10.1",
+    "@react-aria/utils": "^3.34.1",
+    "expo": "~56.0.8",
+    "expo-constants": "~56.0.16",
+    "expo-dev-client": "~56.0.18",
+    "expo-device": "~56.0.4",
+    "expo-font": "~56.0.5",
+    "expo-glass-effect": "~56.0.4",
+    "expo-image": "~56.0.9",
+    "expo-linking": "~56.0.13",
+    "expo-router": "~56.2.8",
+    "expo-splash-screen": "~56.0.10",
+    "expo-status-bar": "~56.0.4",
+    "expo-symbols": "~56.0.5",
+    "expo-system-ui": "~56.0.5",
+    "expo-web-browser": "~56.0.5",
+    "lucide-react-native": "^1.17.0",
+    "nativewind": "^5.0.0-preview.2",
+    "react": "19.2.3",
+    "react-aria": "^3.49.0",
+    "react-dom": "19.2.3",
+    "react-native": "0.85.3",
+    "react-native-css": "^3.0.7",
+    "react-native-gesture-handler": "~2.31.1",
+    "react-native-reanimated": "4.3.1",
+    "react-native-safe-area-context": "~5.7.0",
+    "react-native-screens": "4.25.2",
+    "react-native-svg": "15.15.4",
+    "react-native-web": "~0.21.0",
+    "react-native-worklets": "0.8.3",
+    "react-stately": "^3.47.0",
+    "tailwind-variants": "^0.1.20"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.3.0",
+    "@types/react": "~19.2.2",
+    "babel-plugin-module-resolver": "^5.0.3",
+    "eslint": "^9.0.0",
+    "eslint-config-expo": "~56.0.4",
+    "postcss": "^8.5.15",
+    "tailwindcss": "^4.3.0",
+    "typescript": "~6.0.3"
+  },
+  "scripts": {
+    "start": "expo start",
+    "reset-project": "node ./scripts/reset-project.js",
+    "android": "expo start --android",
+    "ios": "expo start --ios",
+    "web": "expo start --web",
+    "lint": "expo lint"
+  },
+  "private": true,
+  "overrides": {
+    "lightningcss": "1.30.1"
+  },
+  "resolutions": {
+    "lightningcss": "1.30.1"
+  }
+}
