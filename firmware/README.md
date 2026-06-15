@@ -1,1 +1,3 @@
-# PZEM004T DEMO
+# PZEM004T
+
+Firmware code.

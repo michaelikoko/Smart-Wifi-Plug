@@ -27,6 +27,9 @@
     --ring: 212 212 212;
     --accent: 247 247 247;
     --accent-foreground: 52 52 52;
+    --success: 34 197 94;       
+    --warning: 234 179 8;       
+    --info: 59 130 246;         
   }
 
   @media (prefers-color-scheme: dark) {
@@ -48,6 +51,9 @@
       --accent: 38 38 38;
       --accent-foreground: 250 250 250;
       --ring: 115 115 115;
+      --success: 74 222 128;    
+      --warning: 250 204 21;    
+      --info: 96 165 250; 
     }
   }
 
@@ -69,6 +75,9 @@
     --accent: 38 38 38;
     --accent-foreground: 250 250 250;
     --ring: 115 115 115;
+        --success: 74 222 128;
+    --warning: 250 204 21;
+    --info: 96 165 250;
   }
 
   :root.light {
@@ -89,6 +98,9 @@
     --ring: 212 212 212;
     --accent: 247 247 247;
     --accent-foreground: 52 52 52;
+        --success: 34 197 94;
+    --warning: 234 179 8;
+    --info: 59 130 246;
   }
 }
 
@@ -110,4 +122,7 @@
   --color-ring: rgb(var(--ring));
   --color-accent: rgb(var(--accent));
   --color-accent-foreground: rgb(var(--accent-foreground));
+    --color-success: rgb(var(--success));
+  --color-warning: rgb(var(--warning));
+  --color-info: rgb(var(--info));
 }

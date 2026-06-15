@@ -38,7 +38,7 @@ static void publish_telemetry(void)
         return;
     }
 
-    cJSON_AddStringToObject(root, "device_id", SMARTPLUG_ID);
+    //cJSON_AddStringToObject(root, "device_id", SMARTPLUG_ID);
     cJSON_AddNumberToObject(root, "v",     getVoltage());
     cJSON_AddNumberToObject(root, "i",     getCurrent());
     cJSON_AddNumberToObject(root, "p",     getPower());

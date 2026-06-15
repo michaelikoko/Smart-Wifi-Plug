@@ -44,3 +44,5 @@ example
 .vscode/
 .npmrc
 .claude/
+.agents/
+.codex/

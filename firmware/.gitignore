@@ -1,9 +1,21 @@
+# ESP-IDF Build & Config
 build/
 sdkconfig
 sdkconfig.old
-managed_components/
 
-# My rubbish files
-/main/old_code.txt
-/main/old-no-relay.txt
-blah.txt
+# Component Manager Output
+managed_components/
+dependencies.lock
+
+# IDE & Editor files
+.vscode/
+.clangd
+.cache/
+
+# Python compiled files (used by ESP-IDF build scripts)
+__pycache__/
+*.pyc
+
+# Testing and Logs (If you use pytest-embedded)
+.pytest_cache/
+pytest_embedded_log/
