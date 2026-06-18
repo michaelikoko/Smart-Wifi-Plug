@@ -6,6 +6,7 @@ from sqlmodel import select, desc
 from models.telemetry import TelemetryReading, DeviceDailySummary
 from auth.dependencies import CurrentActiveUser
 from models.device import Device
+from typing import Optional
 
 router = APIRouter(prefix="/telemetry", tags=["telemetry"])
 
@@ -23,6 +24,8 @@ def _to_response(reading: TelemetryReading) -> TelemetryResponse:
         pf=reading.pf,
         relay=reading.relay,
         rssi=reading.rssi,
+        created_at=reading.created_at,
+        updated_at=reading.updated_at,
     )
 
 @router.get("/{device_id}", response_model=TelemetryListResponse,
@@ -42,7 +45,9 @@ def get_telemetry(
         select(Device)
         .where(Device.device_id == device_id)
         .where(Device.user_id == current_user.id)
+        .where(Device.is_enabled == True)  # noqa: E712
     ).first()
+
     if not device:
         raise HTTPException(403, "Device not found or access denied")
     
@@ -84,7 +89,9 @@ def get_today_energy(
         select(Device)
         .where(Device.device_id == device_id)
         .where(Device.user_id == current_user.id)
+        .where(Device.is_enabled == True)  # noqa: E712
     ).first()
+
     if not device:
         raise HTTPException(403, "Device not found or access denied")
     
@@ -98,6 +105,10 @@ def get_today_energy(
 
     if not summary:
         raise HTTPException(404, f"No data for today for device '{device_id}'")
+    
+    estimated_cost = None
+    if current_user.billing_rate and summary.kwh_consumed:
+        estimated_cost = int(current_user.billing_rate * summary.kwh_consumed)
 
     return CurrentEnergyResponse(
         device_id    = summary.device_id,
@@ -110,7 +121,8 @@ def get_today_energy(
         peak_power   = summary.peak_power,
         peak_power_timestamp = summary.peak_power_timestamp,
         updated_at = summary.updated_at,
-        created_at = summary.created_at
+        created_at = summary.created_at,
+        estimated_cost = estimated_cost
     )
 
 @router.get(
@@ -133,7 +145,9 @@ def get_energy_history(
         select(Device)
         .where(Device.device_id == device_id)
         .where(Device.user_id == current_user.id)
+        .where(Device.is_enabled == True)  # noqa: E712
     ).first()
+
     if not device:
         raise HTTPException(403, "Device not found or access denied")
     
@@ -147,12 +161,18 @@ def get_energy_history(
     if not summaries:
         raise HTTPException(404, f"No energy history for device '{device_id}'")
 
+    def _calculate_estimated_cost(summary: DeviceDailySummary) -> Optional[int]:
+        if current_user.billing_rate and summary.kwh_consumed:
+            return int(current_user.billing_rate * summary.kwh_consumed)
+        return None
+    
     return [
         EnergyConsumedResponse(
             device_id    = s.device_id,
             date         = s.date,
             kwh_consumed = s.kwh_consumed,
             peak_power   = s.peak_power,
+            estimated_cost = _calculate_estimated_cost(s)
         )
         for s in summaries
     ]

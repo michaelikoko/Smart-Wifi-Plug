@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 from typing import Optional, ClassVar, TYPE_CHECKING
-from sqlmodel import Field, SQLModel, Relationship, Column, DateTime
+from sqlmodel import Field, SQLModel, Relationship, Column, DateTime, func
 
 if TYPE_CHECKING:
     from models.user import User
@@ -22,9 +22,14 @@ class UsedResetToken(SQLModel, table=True):
     __tablename__: ClassVar[str] = "used_reset_tokens"
 
     jti: str = Field(primary_key=True)
-    user_id: int = Field(foreign_key="users.id", index=True)
-    created_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
-        sa_column=Column(DateTime(timezone=True)),
+    user_id: int = Field(foreign_key="users.id", index=True, ondelete="CASCADE")
+    created_at: Optional[datetime] = Field(
+        default=None,
+        sa_column=Column(
+            # pylint: disable=not-callable
+            DateTime(timezone=True),
+            server_default=func.now(),
+            nullable=True,
+        ),
     )
     user: Optional["User"] = Relationship(back_populates="used_reset_tokens")

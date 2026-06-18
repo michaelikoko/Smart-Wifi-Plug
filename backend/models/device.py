@@ -6,6 +6,7 @@ if TYPE_CHECKING:
     from models.user import User
     from models.telemetry import TelemetryReading, DeviceDailySummary
 
+
 class Device(SQLModel, table=True):
     """
     A registered smart plug linked to a user account.
@@ -15,16 +16,22 @@ class Device(SQLModel, table=True):
     user_id     — FK to the user who registered this device
     last_seen   — updated on every telemetry message received by the MQTT handler
     """
+
     __tablename__: ClassVar[str] = "devices"
 
-    id:         Optional[int] = Field(default=None, primary_key=True)
-    device_id:  str           = Field(unique=True, index=True)
-    user_id:    int           = Field(foreign_key="users.id", index=True)
-    name:       str                                 
+    id: Optional[int] = Field(default=None, primary_key=True)
+    device_id: str = Field(unique=True, index=True)
+    user_id: Optional[int] = Field(
+        default=None,
+        foreign_key="users.id",
+        index=True,
+        ondelete="SET NULL"
+    )
+    name: str
     relay_state: bool = False
-    is_enabled:  bool = Field(default=True, nullable=False)
+    is_enabled: bool = Field(default=False, nullable=False)
     is_online: bool = Field(default=False)
-    last_seen:  Optional[datetime] = Field(
+    last_seen: Optional[datetime] = Field(
         default=None,
         sa_column=Column(DateTime(timezone=True), nullable=True),
     )
@@ -32,7 +39,9 @@ class Device(SQLModel, table=True):
         default=None,
         sa_column=Column(
             # pylint: disable=not-callable
-            DateTime(timezone=True), server_default=func.now(), nullable=True
+            DateTime(timezone=True),
+            server_default=func.now(),
+            nullable=True,
         )
     )
     updated_at: Optional[datetime] = Field(
@@ -42,11 +51,14 @@ class Device(SQLModel, table=True):
             DateTime(timezone=True),
             onupdate=func.now(),
             server_default=func.now(),
-            nullable=True
+            nullable=True,
         )
     )
     user: Optional["User"] = Relationship(back_populates="devices")
-    telemetry_readings: list["TelemetryReading"] = Relationship(back_populates="device")
-    daily_summaries: list["DeviceDailySummary"] = Relationship(back_populates="device")
-
-# Decide on what to do with cascade delete later. Deleting a user could either delete all their devices and telemetry, or we could keep the telemetry for historical/analytics purposes and just mark the user_id as null. For now, we'll leave it as is and handle it in the API layer.
+    telemetry_readings: list["TelemetryReading"] = Relationship(
+        back_populates="device", sa_relationship_kwargs={"cascade": "all, delete"}
+    )
+    daily_summaries: list["DeviceDailySummary"] = Relationship(
+        back_populates="device",
+        sa_relationship_kwargs={"cascade": "all, delete"}
+    )

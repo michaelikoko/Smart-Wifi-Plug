@@ -66,13 +66,13 @@ def create_access_token(user_id: int, email: str):
     """
     Create JWT access token with user email and id as payload.
     """
-    payload: AccessTokenPayload = {
-        "sub": str(user_id),
-        "email": email,
-        "exp": get_access_token_expire_time(),
-        "type": "access",
-    }
-    return jwt.encode(dict(payload), ACCESS_TOKEN_SECRET_KEY, algorithm=ALGORITHM)
+    payload = AccessTokenPayload (
+        sub=str(user_id),
+        email=email,
+        exp=get_access_token_expire_time(),
+        type="access",
+    )
+    return jwt.encode(payload.model_dump(), ACCESS_TOKEN_SECRET_KEY, algorithm=ALGORITHM)
 
 
 def create_refresh_token(user_id: int, email: str) -> str:
@@ -80,25 +80,25 @@ def create_refresh_token(user_id: int, email: str) -> str:
     Create a JWT refresh token with user email and id as payload.
     """
     # jti (JWT ID) is a random nonce that makes every refresh token unique and lets us invalidate individual tokens without touching the others.
-    payload: RefreshTokenPayload = {
-        "sub": str(user_id),
-        "email": email,
-        "exp": get_refresh_token_expire_time(),
-        "type": "refresh",
-        "jti": secrets.token_hex(32),
-    }
-    return jwt.encode(dict(payload), REFRESH_TOKEN_SECRET_KEY, algorithm=ALGORITHM)
+    payload = RefreshTokenPayload(
+        sub=str(user_id),
+        email=email,
+        exp=get_refresh_token_expire_time(),
+        type="refresh",
+        jti=secrets.token_hex(32),
+    )
+    return jwt.encode(payload.model_dump(), REFRESH_TOKEN_SECRET_KEY, algorithm=ALGORITHM)
 
 
-# def decode_access_token(token: str) -> AccessTokenPayload:
-def decode_access_token(token: str) -> dict:
+def decode_access_token(token: str) -> AccessTokenPayload:
     """
     Decode and validate an access token.
     Raises HTTP 401 on any failure.
     """
     try:
-        payload = jwt.decode(token, ACCESS_TOKEN_SECRET_KEY, algorithms=[ALGORITHM])
-        if payload.get("type") != "access":
+        raw_payload = jwt.decode(token, ACCESS_TOKEN_SECRET_KEY, algorithms=[ALGORITHM])
+        payload = AccessTokenPayload(**raw_payload)
+        if payload.type != "access":
             raise ValueError("Wrong token type")
         return payload
     except PyJWTError as exc:
@@ -109,15 +109,15 @@ def decode_access_token(token: str) -> dict:
         ) from exc
 
 
-# def decode_refresh_token(token: str) -> RefreshTokenPayload:
-def decode_refresh_token(token: str) -> dict:
+def decode_refresh_token(token: str) -> RefreshTokenPayload:
     """
     Decode and validate a refresh token.
     Raises HTTP 401 on any failure.
     """
     try:
-        payload = jwt.decode(token, REFRESH_TOKEN_SECRET_KEY, algorithms=[ALGORITHM])
-        if payload.get("type") != "refresh":
+        raw_payload = jwt.decode(token, REFRESH_TOKEN_SECRET_KEY, algorithms=[ALGORITHM])
+        payload = RefreshTokenPayload(**raw_payload)
+        if payload.type != "refresh":
             raise ValueError("Wrong token type")
         return payload
     except PyJWTError as exc:
@@ -149,7 +149,7 @@ def get_current_user(
     Return current authenticated user.
     """
     payload = decode_access_token(token.credentials)
-    user_id = int(payload["sub"])
+    user_id = int(payload.sub)
     user = session.exec(select(User).where(User.id == int(user_id))).first()
 
     if user is None:
@@ -257,14 +257,8 @@ def verify_otp(session: Session, user_id: int, purpose: OtpPurpose, code: str) -
     if record is None:
         raise generic_error
     
-    #print(record.expires_at)
-    #print(record.expires_at.tzinfo)
-
-    #if record.expires_at < datetime.now(timezone.utc):
-    print(record.expires_at)
-    print(datetime.now(timezone.utc).replace(tzinfo=None))
-    print(record.expires_at < datetime.now(timezone.utc).replace(tzinfo=None))
-    if record.expires_at < datetime.now(timezone.utc).replace(tzinfo=None):
+    #if record.expires_at < datetime.now(timezone.utc).replace(tzinfo=None): For SQLite, we need to remove tzinfo for comparison
+    if record.expires_at < datetime.now(timezone.utc):
         record.consumed = True
         session.commit()
         raise generic_error
@@ -288,21 +282,22 @@ def create_reset_token(user_id: int, email: str) -> str:
     """
     Create a JWT password-reset token with user id as payload.
     """
-    payload: ResetTokenPayload = {
-        "email": email,
-        "sub": str(user_id),
-        "exp": get_reset_token_expire_time(),
-        "type": "reset",
-        "jti": secrets.token_hex(32),
-    }
-    return jwt.encode(dict(payload), RESET_TOKEN_SECRET_KEY, algorithm=ALGORITHM)
+    payload = ResetTokenPayload(
+        email=email,
+        sub=str(user_id),
+        exp=get_reset_token_expire_time(),
+        type="reset",
+        jti=secrets.token_hex(32),
+    )
+    return jwt.encode(payload.model_dump(), RESET_TOKEN_SECRET_KEY, algorithm=ALGORITHM)
 
 
-def decode_reset_token(token: str) -> dict:
+def decode_reset_token(token: str) -> ResetTokenPayload:
     """Decode + validate a password-reset token. Raises 401 on failure."""
     try:
-        payload = jwt.decode(token, RESET_TOKEN_SECRET_KEY, algorithms=[ALGORITHM])
-        if payload.get("type") != "reset":
+        raw_payload = jwt.decode(token, RESET_TOKEN_SECRET_KEY, algorithms=[ALGORITHM])
+        payload = ResetTokenPayload(**raw_payload)
+        if payload.type != "reset":
             raise ValueError("Wrong token type")
         return payload
     except PyJWTError as exc:

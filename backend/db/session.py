@@ -6,12 +6,14 @@ from dotenv import load_dotenv
 import models
 
 load_dotenv()
-SQLITE_URL = os.getenv("SQLITE_URL") or "sqlite:///./database.db"
-#POSTGRES_URL = os.getenv("POSTGRES_URL")
+#SQLITE_URL = os.getenv("SQLITE_URL") or "sqlite:///./database.db"
+POSTGRES_URL = os.getenv("POSTGRES_URL")
+if not POSTGRES_URL:
+    raise ValueError("POSTGRES_URL environment variable is not set")
 
 connect_args = {"check_same_thread": False}
-engine = create_engine(SQLITE_URL, connect_args=connect_args)
-#engine = create_engine(POSTGRES_URL, echo=True)
+#engine = create_engine(SQLITE_URL, connect_args=connect_args)
+engine = create_engine(POSTGRES_URL, echo=True, pool_pre_ping=True)
 
 def create_db_and_tables():
     """

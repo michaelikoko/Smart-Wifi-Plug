@@ -5,7 +5,10 @@
 #include "mqtt_client.h"
 
 void relay_init(void);
-// source indicates what triggered the relay change. "app" for MQTT commands, "boot" for initial publish on MQTT connect.
+// source indicates what triggered the relay change. 
+// -> "app": for MQTT commands, 
+// -> "boot": for initial publish on MQTT connect.
+// -> "button": for physical button presses
 void relay_set_and_publish(esp_mqtt_client_handle_t client, bool state, const char *source);
 bool relay_get_state(void);
 void relay_save_state(bool state);   // write to NVS

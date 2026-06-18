@@ -21,7 +21,7 @@
 // Publish device status -> Payload: {"status": "offline"} or {"status": "online"}
 #define MQTT_TOPIC_PUB_DEVICE_STATUS    MQTT_TOPIC_PREFIX "/status"
 
-// Publish current relay state -> Payload: {"state": "ON"} or {"state": "OFF"}
+// Publish current relay state -> Payload: {"state": "ON"|"OFF", "source": "app"|"button"|"boot", "ts": 1234567890} 
 #define MQTT_TOPIC_PUB_RELAY_STATE      MQTT_TOPIC_PREFIX "/relay/state"
 
 // Publish telemetry data (voltage, current, power, etc.) -> Payload: {"voltage": 230.5, "current": 0.5, "power": 115.25, "energy": 1.234, "frequency": 50.0, "pf": 0.95}

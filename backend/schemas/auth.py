@@ -1,5 +1,5 @@
-from pydantic import BaseModel, EmailStr, ConfigDict
-from typing import Optional, TypedDict, Literal
+from pydantic import BaseModel, EmailStr, model_validator
+from typing import Literal
 from datetime import datetime
 
 class RegisterRequest(BaseModel):
@@ -10,6 +10,15 @@ class RegisterRequest(BaseModel):
     password: str
     confirm_password: str
     full_name: str
+
+    @model_validator(mode='after')
+    def check_passwords_match(self) -> 'RegisterRequest':
+        """
+        Validator to ensure that the password and confirm_password fields match.
+        """
+        if self.password != self.confirm_password:
+            raise ValueError('Passwords do not match')
+        return self
 
 
 class LoginRequest(BaseModel):
@@ -25,7 +34,7 @@ class RefreshRequest(BaseModel):
     """
     refresh_token: str
 
-class TokenPayloadBase(TypedDict):
+class TokenPayloadBase(BaseModel):
     """
     Payload schema for JWT token.
     """
@@ -44,14 +53,14 @@ class RefreshTokenPayload(TokenPayloadBase):
     Payload schema for JWT refresh token, which includes a `jti` for rotation and reuse detection.
     """
     type: Literal["refresh"]
-    jti: Optional[str]  # JWT ID for refresh tokens, used for rotation and reuse detection
+    jti: str  # JWT ID for refresh tokens, used for rotation and reuse detection
 
 class ResetTokenPayload(TokenPayloadBase):
     """
     Payload schema for password reset JWT token, issued after successful OTP verification.
     """
     type: Literal["reset"]
-    jti: Optional[str]  # JWT ID for reset tokens, used for single-use enforcement
+    jti: str  # JWT ID for reset tokens, used for single-use enforcement
 
 class TokenResponse(BaseModel):
     """
@@ -60,19 +69,6 @@ class TokenResponse(BaseModel):
     access_token: str
     refresh_token: str
     token_type:   str = "bearer"
-
-
-class UserResponse(BaseModel):
-    """
-    Response schema for user information.
-    """
-    model_config = ConfigDict(from_attributes=True)
-    id:         int
-    email:      str
-    full_name:  str
-    is_active: bool
-    created_at: Optional[datetime] = None
-    updated_at: Optional[datetime] = None
 
 class ForgotPasswordRequest(BaseModel):
     """
@@ -109,7 +105,16 @@ class ResetPasswordRequest(BaseModel):
     """
     new_password: str
     confirm_password: str
- 
+
+    @model_validator(mode='after')
+    def check_passwords_match(self) -> 'ResetPasswordRequest':
+        """
+        Validator to ensure that the new_password and confirm_password fields match.
+        """
+        if self.new_password != self.confirm_password:
+            raise ValueError('Passwords do not match')
+        return self
+    
 class ResetPasswordResponse(BaseModel):
     """
     Reset password response schema.

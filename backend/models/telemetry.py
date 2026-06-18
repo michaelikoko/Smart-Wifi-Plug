@@ -1,9 +1,10 @@
 from sqlmodel import SQLModel, Field, Column, DateTime, func, Relationship
 from typing import Optional, ClassVar, TYPE_CHECKING
-from datetime import datetime, timezone,  date as date_type
+from datetime import datetime, timezone, date as date_type
 
 if TYPE_CHECKING:
     from models.device import Device
+
 
 class TelemetryReading(SQLModel, table=True):
     """
@@ -19,11 +20,24 @@ class TelemetryReading(SQLModel, table=True):
 
     id: Optional[int] = Field(default=None, primary_key=True)
     device_id: str = Field(
-        foreign_key="devices.device_id",
-        index=True
+        foreign_key="devices.device_id", index=True, ondelete="CASCADE"
     )
-    timestamp: datetime = Field(index=True)  # ESP32 timestamp converted to datetime in UTC
-    received_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    timestamp: datetime = Field(
+        sa_column=Column(
+            # pylint: disable=not-callable
+            DateTime(timezone=True),
+            index=True,
+            nullable=False,
+        )
+    )  # ESP32 timestamp converted to datetime in UTC
+    received_at: datetime = Field(
+        default_factory=lambda: datetime.now(timezone.utc),
+        sa_column=Column(
+            # pylint: disable=not-callable
+            DateTime(timezone=True),
+            nullable=False,
+        ),
+    )
 
     voltage: float  # V
     current: float  # A
@@ -39,8 +53,8 @@ class TelemetryReading(SQLModel, table=True):
             # pylint: disable=not-callable
             DateTime(timezone=True),
             server_default=func.now(),
-            nullable=True
-        )
+            nullable=True,
+        ),
     )
     updated_at: Optional[datetime] = Field(
         default=None,
@@ -49,8 +63,8 @@ class TelemetryReading(SQLModel, table=True):
             DateTime(timezone=True),
             onupdate=func.now(),
             server_default=func.now(),
-            nullable=True
-        )
+            nullable=True,
+        ),
     )
     device: Optional["Device"] = Relationship(back_populates="telemetry_readings")
 
@@ -65,24 +79,33 @@ class DeviceDailySummary(SQLModel, table=True):
     kwh_consumed = energy_last - energy_first
     This is computed on every new reading and stored for fast retrieval.
     """
+
     __tablename__: ClassVar[str] = "energy_daily"
 
     id: Optional[int] = Field(default=None, primary_key=True)
-    device_id: str = Field(foreign_key="devices.device_id", index=True)
+    device_id: str = Field(
+        foreign_key="devices.device_id", index=True, ondelete="CASCADE"
+    )
     date: date_type = Field(index=True)  # "YYYY-MM-DD" in UTC
 
     # First reading of the day — set once, never updated
     energy_first: float  # kWh at start of day
-    energy_first_timestamp: datetime  # ESP32 timestamp of first reading
+    energy_first_timestamp: datetime = Field(
+        sa_column=Column(DateTime(timezone=True), nullable=False)
+    )  # ESP32 timestamp of first reading
 
     # Last reading of the day — updated on every new reading
     energy_last: Optional[float] = None  # kWh at latest reading
-    energy_last_timestamp: Optional[datetime] = None  # ESP32 timestamp of latest reading
+    energy_last_timestamp: Optional[datetime] = Field(
+        sa_column=Column(DateTime(timezone=True), nullable=True)
+    )  # ESP32 timestamp of latest reading
 
     # Derived — updated on every new reading
     kwh_consumed: Optional[float] = None  # energy_last - energy_first
     peak_power: Optional[float] = None  # max instantaneous power today
-    peak_power_timestamp: Optional[datetime] = None  # ESP32 timestamp of peak power reading
+    peak_power_timestamp: Optional[datetime] = Field(
+        sa_column=Column(DateTime(timezone=True), nullable=True)
+    )  # ESP32 timestamp of peak power reading
 
     created_at: Optional[datetime] = Field(
         default=None,
@@ -90,7 +113,7 @@ class DeviceDailySummary(SQLModel, table=True):
             # pylint: disable=not-callable
             DateTime(timezone=True),
             server_default=func.now(),
-            nullable=True
+            nullable=True,
         )
     )
     updated_at: Optional[datetime] = Field(
@@ -100,7 +123,7 @@ class DeviceDailySummary(SQLModel, table=True):
             DateTime(timezone=True),
             onupdate=func.now(),
             server_default=func.now(),
-            nullable=True
+            nullable=True,
         )
     )
     device: Optional["Device"] = Relationship(back_populates="daily_summaries")

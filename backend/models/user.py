@@ -21,6 +21,7 @@ class User(SQLModel, table=True):
     email: EmailStr = Field(unique=True, index=True, max_length=255)
     password_hash: str = Field(nullable=False)
     is_active: bool = Field(default=True, nullable=False)
+    billing_rate: Optional[int] = Field(default=None) # The cost per kWh in kobo.
     created_at: Optional[datetime] = Field(
         default=None,
         sa_column=Column(
@@ -28,7 +29,7 @@ class User(SQLModel, table=True):
             DateTime(timezone=True),
             server_default=func.now(),
             nullable=True,
-        ),
+        )
     )
     updated_at: Optional[datetime] = Field(
         default=None,
@@ -38,9 +39,15 @@ class User(SQLModel, table=True):
             onupdate=func.now(),
             server_default=func.now(),
             nullable=True,
-        ),
+        )
     )
 
     devices: list["Device"] = Relationship(back_populates="user")
-    refresh_tokens: list["RefreshToken"] = Relationship(back_populates="user")
-    used_reset_tokens: list["UsedResetToken"] = Relationship(back_populates="user")
+    refresh_tokens: list["RefreshToken"] = Relationship(
+        back_populates="user",
+        sa_relationship_kwargs={"cascade": "all, delete"}
+    )
+    used_reset_tokens: list["UsedResetToken"] = Relationship(
+        back_populates="user",
+        sa_relationship_kwargs={"cascade": "all, delete"}
+    )

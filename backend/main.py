@@ -15,7 +15,7 @@ from routes.devices import router as devices_router
 from mqtt.handlers import fast_mqtt, register_mqtt_handlers, start_staleness_sweep
 
 # Database
-from db.session import create_db_and_tables
+#from db.session import create_db_and_tables
 
 
 @asynccontextmanager
@@ -23,7 +23,8 @@ async def _lifespan(_app: FastAPI):
     """
     Lifecycle manager for the FastAPI application.
     """
-    create_db_and_tables()
+    # Alembic is being used for database migrations
+    #create_db_and_tables()
     register_mqtt_handlers()
     asyncio.create_task(start_staleness_sweep())
     await fast_mqtt.mqtt_startup()

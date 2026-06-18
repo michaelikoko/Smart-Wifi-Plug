@@ -12,7 +12,6 @@ router = APIRouter(prefix="/devices", tags=["Devices"])
 @router.post(
     "/register",
     response_model=DeviceResponse,
-    status_code=status.HTTP_201_CREATED,
     summary="Register a smart plug to the authenticated user",
 )
 def register_device(
@@ -23,25 +22,31 @@ def register_device(
     """
     Register a smart plug to an authenticated user.
     """
-    existing = session.exec(
+    device = session.exec(
         select(Device).where(Device.device_id == body.device_id)
     ).first()
-    if existing:
+    if not device:
         raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=f"Device '{body.device_id}' is already registered",
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Invalid Device ID: '{body.device_id}' is not a registered device.",
         )
+
+    if device.user_id is not None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Device '{body.device_id}' is already registered to another user.",
+        )
+
     if current_user.id is None:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="User ID is missing from the database record.",
         )
 
-    device = Device(
-        device_id = body.device_id,
-        user_id   = current_user.id,
-        name      = body.name,
-    )
+    device.user_id = current_user.id
+    device.name = body.name
+    device.is_enabled = True  # Enable the device upon registration
+
     session.add(device)
     session.commit()
     session.refresh(device)
@@ -60,7 +65,7 @@ def list_devices(session: SessionDep, current_user: CurrentActiveUser):
     devices = session.exec(
         select(Device)
         .where(Device.user_id == current_user.id)
-        .where(Device.is_enabled == True)
+        .where(Device.is_enabled == True)  # noqa: E712
     ).all()
     return devices
 
@@ -136,10 +141,10 @@ def delete_device(
     device = _get_owned_device(device_id, current_user.id, session)
     # Soft delete — mark inactive rather than removing the row
     # Preserves telemetry history linked to this device_id
+    device.user_id = None  # Unassign from user
     device.is_enabled = False
     session.add(device)
     session.commit()
-
 
 
 def _get_owned_device(device_id: str, user_id: int, session) -> Device:
@@ -151,7 +156,7 @@ def _get_owned_device(device_id: str, user_id: int, session) -> Device:
         select(Device)
         .where(Device.device_id == device_id)
         .where(Device.user_id == user_id)
-        .where(Device.is_enabled == True)
+        .where(Device.is_enabled == True)  # noqa: E712
     ).first()
     if not device:
         raise HTTPException(

@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 from enum import Enum
 from typing import Optional, ClassVar
-from sqlmodel import Field, SQLModel, DateTime, Column
+from sqlmodel import Field, SQLModel, DateTime, Column, func
 
 
 class OtpPurpose(str, Enum):
@@ -27,7 +27,7 @@ class OtpCode(SQLModel, table=True):
 
     id: Optional[int] = Field(default=None, primary_key=True)
 
-    user_id: int = Field(foreign_key="users.id", index=True)
+    user_id: int = Field(foreign_key="users.id", index=True, ondelete="CASCADE")
     purpose: OtpPurpose = Field(index=True)
 
     otp_hash: str
@@ -35,13 +35,19 @@ class OtpCode(SQLModel, table=True):
     attempts: int = Field(default=0)
     consumed: bool = Field(default=False)
 
-    created_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
-        sa_column=Column(DateTime(timezone=True)),
+
+    created_at: Optional[datetime] = Field(
+        default=None,
+        sa_column=Column(
+            # pylint: disable=not-callable
+            DateTime(timezone=True),
+            server_default=func.now(),
+            nullable=True,
+        )
     )
     expires_at: datetime = Field(
         sa_column=Column(
             DateTime(timezone=True),
             nullable=False,
-        ),
+        )
     )

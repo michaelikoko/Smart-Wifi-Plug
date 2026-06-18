@@ -9,6 +9,7 @@ export interface UserResponse {
   email: string;
   full_name: string;
   is_active: boolean;
+  billing_rate: number | null; // In kobo/kWh
   created_at: Date;
   updated_at: Date;
 }

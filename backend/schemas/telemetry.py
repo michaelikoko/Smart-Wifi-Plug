@@ -4,7 +4,6 @@ from datetime import datetime, date as date_type
 
 class TelemetryPayload(BaseModel):
     """This schema matches the JSON published by the ESP32 firmware."""
-    #device_id: str
     ts:        int
     v:         float
     i:         float
@@ -33,8 +32,8 @@ class TelemetryResponse(BaseModel):
     pf:          float
     relay:       int
     rssi:        Optional[int]
-
-
+    created_at:  Optional[datetime]
+    updated_at:  Optional[datetime]
 
 class TelemetryListResponse(BaseModel):
     """
@@ -56,9 +55,9 @@ class CurrentEnergyResponse(BaseModel):
     kwh_consumed: Optional[float]
     peak_power:   Optional[float]
     peak_power_timestamp: Optional[datetime]
-    updated_at: datetime | None
-    created_at: datetime | None
-
+    updated_at: Optional[datetime]
+    created_at: Optional[datetime]
+    estimated_cost: Optional[int] = None # Estimated cost in kobo. This is not stored in the database, but calculated on the fly using the user's billing_rate and the kwh consumed in the current day.
 
 
 class EnergyConsumedResponse(BaseModel):
@@ -67,4 +66,4 @@ class EnergyConsumedResponse(BaseModel):
     date:         date_type
     kwh_consumed: Optional[float]
     peak_power:   Optional[float]
-    
+    estimated_cost: Optional[int] = None # Estimated cost in kobo.
