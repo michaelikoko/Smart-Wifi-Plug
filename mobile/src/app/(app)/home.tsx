@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { ScrollView, View, RefreshControl, Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
 import {

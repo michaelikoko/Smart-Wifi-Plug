@@ -122,6 +122,13 @@ function _handleMessage(topic: string, payloadBuffer: Buffer) {
     setRelayState(deviceId, relayState);
     return;
   }
+
+  if (subtopic === 'be-online-status') {
+    // Backend payload: { isOnline: true|false }
+    console.log(`[mqtt] device ${deviceId} online status:`, data);
+    useDeviceStateStore.getState().setOnlineStatus(deviceId, Boolean(data.is_online));
+    return;
+  }
 }
 
 
@@ -129,6 +136,7 @@ function _subscribeTopicsForDevices(deviceIds: string[], c: MqttClient) {
   const topics = deviceIds.flatMap((id) => [
     `smartplug/${id}/telemetry`,
     `smartplug/${id}/relay/state`,
+    `smartplug/${id}/be-online-status`, // Endpoint that only the server publishes to indicate online/offline status 
   ]);
 
   c.subscribe(topics, { qos: 1 }, (err) => {

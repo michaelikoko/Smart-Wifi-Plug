@@ -24,12 +24,14 @@ export interface LiveRelayState {
 interface DeviceStateEntry {
   telemetry: LiveTelemetry | null;
   relayState: LiveRelayState | null;
+  isOnline: boolean | null; // null = unknown, true = online, false = offline
 }
 
 interface DeviceStateStore {
   devices: Record<string, DeviceStateEntry>; // keyed by device_id
 
   setTelemetry: (deviceId: string, data: LiveTelemetry) => void;
+  setOnlineStatus: (deviceId: string, isOnline: boolean) => void;
   setRelayState: (deviceId: string, data: LiveRelayState) => void;
   clearDevice: (deviceId: string) => void;
   clearAll: () => void;
@@ -38,6 +40,7 @@ interface DeviceStateStore {
 const DEFAULT_ENTRY: DeviceStateEntry = {
   telemetry: null,
   relayState: null,
+  isOnline: null,
 };
 
 export const useDeviceStateStore = create<DeviceStateStore>((set) => ({
@@ -51,6 +54,14 @@ export const useDeviceStateStore = create<DeviceStateStore>((set) => ({
           ...(state.devices[deviceId] ?? DEFAULT_ENTRY),
           telemetry: data,
         },
+      },
+    })),
+
+  setOnlineStatus: (deviceId, isOnline) =>
+    set((state) => ({
+      devices: {
+        ...state.devices,
+        [deviceId]: { ...(state.devices[deviceId] ?? DEFAULT_ENTRY), isOnline },
       },
     })),
 
