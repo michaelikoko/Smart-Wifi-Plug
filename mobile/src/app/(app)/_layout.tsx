@@ -49,7 +49,7 @@ export default function AppTabsLayout() {
   const mode = colorScheme === 'dark' ? 'dark' : 'light';
   const c = COLORS[mode];
 
-  const insets = useSafeAreaInsets(); 
+  const insets = useSafeAreaInsets();
   return (
     <Tabs
       screenOptions={{
@@ -105,6 +105,12 @@ export default function AppTabsLayout() {
           title: 'Profile',
           tabBarIcon: ({ color }) => <TabIcon icon={User} color={color} />,
         }}
+      />
+      {/* Device detail screen — exists in this route group but hidden from tab bar.
+          Pushed via router.push('/(app)/device/esp32-smartplug-001') from home.tsx */}
+      <Tabs.Screen
+        name="device/[device_id]"
+        options={{ href: null, headerShown: false }}
       />
     </Tabs>
   );

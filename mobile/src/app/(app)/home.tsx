@@ -1,7 +1,10 @@
 import { useEffect, useState } from 'react';
-import { ScrollView, View, RefreshControl } from 'react-native';
+import { ScrollView, View, RefreshControl, Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Bell, CheckCircle2, CircleX, LogOut, PlugZap, Zap } from 'lucide-react-native';
+import {
+  Bell, CheckCircle2, ChevronRight, RefreshCcw, LogOut,
+  PlugZap, WifiOff, Zap, Cpu,
+} from 'lucide-react-native';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { Card } from '@/components/ui/card';
@@ -10,26 +13,132 @@ import { HStack } from '@/components/ui/hstack';
 import { Heading } from '@/components/ui/heading';
 import { Text } from '@/components/ui/text';
 import { Badge, BadgeText } from '@/components/ui/badge';
-import { Pressable } from '@/components/ui/pressable';
 import { Spinner } from '@/components/ui/spinner';
 
-import { MetricCard, RelayRow, WeeklyBars, type WeeklyBarDatum } from '@/components/app-ui';
 import { useAuthStore } from '../../store/auth-store';
 import { useDeviceStateStore } from '../../store/device-state-store';
 import { getMe, logoutUser } from '../../api/auth-api';
-import { listDevices } from '../../api/devices-api';
-import { getTodayEnergy, getEnergyHistory, is404 } from '../../api/telemetry-api';
-import {
-  subscribeToDevices,
-  publishRelayCommand,
-  disconnectMqtt,
-} from '../../lib/mqtt-client';
+import { listDevices, type DeviceResponse } from '../../api/devices-api';
+import { subscribeToDevices, disconnectMqtt } from '../../lib/mqtt-client';
 
-function dayLabel(dateStr: string): string {
-  return new Date(dateStr + 'T00:00:00Z').toLocaleDateString('en-US', {
-    weekday: 'short',
-    timeZone: 'UTC',
-  });
+
+function DeviceCard({
+  device,
+  livePower,
+  liveRelayOn,
+  onPress,
+}: {
+  device: DeviceResponse;
+  livePower: number | null;
+  liveRelayOn: boolean;
+  onPress: () => void;
+}) {
+  const powerStr = livePower != null ? `${livePower.toFixed(1)} W` : 'loading...';
+
+  return (
+    <Pressable onPress={onPress} android_ripple={{ color: '#e5e5e5' }}>
+      <Card size="sm" className="w-full rounded-2xl">
+        <HStack className="items-center gap-4">
+          <View className="relative">
+            <View className="h-12 w-12 items-center justify-center rounded-xl bg-secondary">
+              <Cpu size={22} color="#737373" />
+            </View>
+            <View
+              className={[
+                'absolute -right-1 -top-1 h-3 w-3 rounded-full border-2 border-card',
+                device.is_online ? 'bg-emerald-500' : 'bg-muted-foreground',
+              ].join(' ')}
+            />
+          </View>
+
+          <VStack className="flex-1 gap-0.5">
+            <Text className="text-[15px] font-bold text-foreground">{device.name}</Text>
+            <Text className="text-[11px] font-mono text-muted-foreground">{device.device_id}</Text>
+          </VStack>
+
+          <VStack className="items-end gap-1.5">
+            <Text className={`text-[13px] font-semibold ${livePower != null ? 'text-foreground' : 'text-muted-foreground italic'}`}>{powerStr}</Text>
+            <View
+              className={[
+                'rounded-md px-2.5 py-0.5',
+                liveRelayOn ? 'bg-emerald-500' : 'bg-muted',
+              ].join(' ')}
+            >
+              <Text
+                className={[
+                  'text-[10px] font-bold uppercase tracking-wider',
+                  liveRelayOn ? 'text-white' : 'text-muted-foreground',
+                ].join(' ')}
+              >
+                {liveRelayOn ? 'On' : 'Off'}
+              </Text>
+            </View>
+          </VStack>
+
+          <ChevronRight size={16} color="#9ca3af" />
+        </HStack>
+      </Card>
+    </Pressable>
+  );
+}
+
+function EmptyState() {
+  return (
+    <Card size="default" className="w-full items-center rounded-2xl py-10">
+      <VStack className="items-center gap-4">
+        <View className="h-16 w-16 items-center justify-center rounded-2xl bg-secondary">
+          <PlugZap size={28} color="#737373" />
+        </View>
+        <VStack className="items-center gap-2">
+          <Heading size="md" className="text-center text-foreground">
+            No devices yet
+          </Heading>
+          <Text className="max-w-55 text-center text-sm text-muted-foreground">
+            Register your first smart plug to start monitoring energy usage.
+          </Text>
+        </VStack>
+      </VStack>
+    </Card>
+  );
+}
+
+function DeviceSkeleton() {
+  return (
+    <VStack className="gap-2 mt-2">
+      <Card size="sm" className="w-full h-19 rounded-2xl bg-muted/40" />
+      <Card size="sm" className="w-full h-19 rounded-2xl bg-muted/40" />
+      <Card size="sm" className="w-full h-19 rounded-2xl bg-muted/40" />
+    </VStack>
+  );
+}
+
+function ErrorState({ onRetry }: { onRetry: () => void }) {
+  return (
+    <Card size="default" className="w-full items-center rounded-2xl py-10">
+      <VStack className="items-center gap-4">
+        <View className="h-16 w-16 items-center justify-center rounded-2xl bg-destructive/10">
+          <WifiOff size={28} color="#ef4444" />
+        </View>
+        <VStack className="items-center gap-2">
+          <Heading size="md" className="text-center text-foreground">
+            Connection Error
+          </Heading>
+          <Text className="text-center text-sm text-muted-foreground px-4">
+            Unable to connect to the server. Please check your internet and try again.
+          </Text>
+        </VStack>
+        <Pressable
+          onPress={onRetry}
+          className="mt-2 flex-row items-center gap-2 rounded-xl bg-secondary px-5 py-3 active:opacity-70"
+        >
+          <RefreshCcw size={16} color="#171717" />
+          <Text className="text-[13px] font-bold uppercase tracking-widest text-foreground">
+            Retry
+          </Text>
+        </Pressable>
+      </VStack>
+    </Card>
+  );
 }
 
 export default function HomeScreen() {
@@ -38,15 +147,9 @@ export default function HomeScreen() {
 
   const storeUser = useAuthStore((s) => s.user);
   const setUser = useAuthStore((s) => s.setUser);
-
-  // Live MQTT data for all devices — updates automatically as messages arrive.
   const liveDeviceState = useDeviceStateStore((s) => s.devices);
 
-  // Per-device optimistic "toggling" flag: set on publish, cleared when the
-  // relay/state confirmation arrives from the device via MQTT subscription.
-  const [togglingDeviceIds, setTogglingDeviceIds] = useState<Set<string>>(new Set());
-
-  // /auth/me 
+  // /auth/me
   const {
     data: user,
     refetch: refetchMe,
@@ -63,153 +166,58 @@ export default function HomeScreen() {
 
   const firstName = user?.full_name?.split(' ')[0] ?? 'Operator';
 
-  // Device list 
-  // Fetch on mount → drives MQTT subscriptions + REST telemetry queries.
-  // REST device list gives us ownership info and the last-known relay_state
-  // from the backend (used as the initial state before MQTT messages arrive).
+  // Devices
   const {
     data: devices = [],
     refetch: refetchDevices,
     isRefetching: isRefetchingDevices,
+    isLoading: isLoadingDevices,
+    isError: isErrorDevices,
   } = useQuery({
     queryKey: ['devices'],
     queryFn: listDevices,
   });
 
-  // Subscribe to MQTT topics for all registered devices.
-  // Effect re-runs if the device list changes (e.g. after registering a new device).
+  // Subscribe to MQTT topics for all registered devices
   useEffect(() => {
     if (devices.length === 0) return;
     subscribeToDevices(devices.map((d) => d.device_id));
   }, [devices]);
 
-  const primaryDevice = devices[0];
-
-  // Resolve online/offline from the REST device list (set by backend's
-  // MQTT on_status handler + staleness sweep). Not driven by MQTT client-side
-  // to avoid duplicating the backend's own staleness logic.
+  // Fleet counts
   const onlineCount = devices.filter((d) => d.is_online).length;
   const offlineCount = devices.length - onlineCount;
 
-  // Today's energy summary (REST, pull-to-refresh) 
-  // Design choice: fetch once on mount, user refreshes via pull-to-refresh.
-  // The backend updates DeviceDailySummary on every telemetry write (~10s),
-  // so a pull-to-refresh gives the user a reasonably fresh number without
-  // continuous polling. Live "current power" comes from MQTT below.
-  const {
-    data: todayEnergy,
-    refetch: refetchToday,
-    isRefetching: isRefetchingToday,
-  } = useQuery({
-    queryKey: ['energy-today', primaryDevice?.device_id],
-    queryFn: () => getTodayEnergy(primaryDevice!.device_id),
-    enabled: !!primaryDevice,
-    staleTime: 30_000, // treat as fresh for 30s to avoid redundant refetches
-    retry: (failureCount, error) => (!is404(error) && failureCount < 2),
-  });
+  // Helpers to resolve live state from MQTT store, falling back to REST
+  const getLiveRelay = (deviceId: string, fallback: boolean): boolean => {
+    const confirmed = liveDeviceState[deviceId]?.relayState;
+    return confirmed != null ? confirmed.state === 'ON' : fallback;
+  };
 
-  // 7-day energy history (REST, pull-to-refresh) 
-  // Changes at most once per day — staleTime of 5 min is appropriate.
-  const {
-    data: energyHistory,
-    refetch: refetchHistory,
-    isRefetching: isRefetchingHistory,
-  } = useQuery({
-    queryKey: ['energy-history', primaryDevice?.device_id],
-    queryFn: () => getEnergyHistory(primaryDevice!.device_id, 7),
-    enabled: !!primaryDevice,
-    staleTime: 5 * 60_000,
-    retry: (failureCount, error) => (!is404(error) && failureCount < 2),
-  });
+  const getLivePower = (deviceId: string): number | null =>
+    liveDeviceState[deviceId]?.telemetry?.power ?? null;
 
-  const weeklyData: WeeklyBarDatum[] = (energyHistory ?? [])
-    .slice()
-    .reverse()
-    .map((row) => ({ day: dayLabel(row.date), kwh: row.kwh_consumed, costKobo: row.estimated_cost }));
+  const activeRelayCount = devices.filter((d) =>
+    getLiveRelay(d.device_id, d.relay_state)
+  ).length;
 
-  // Pull-to-refresh 
-  const isRefetching =
-    isRefetchingMe || isRefetchingDevices || isRefetchingToday || isRefetchingHistory;
+  // Total live power across all devices
+  const totalLivePower = devices.reduce((sum, d) => {
+    const p = getLivePower(d.device_id);
+    return sum + (p ?? 0);
+  }, 0);
+
+  // Pull-to-refresh
+  const isRefetching = isRefetchingMe || isRefetchingDevices;
 
   const onRefresh = async () => {
     await queryClient.invalidateQueries({
-      predicate: (q) =>
-        ['me', 'devices', 'energy-today', 'energy-history'].includes(q.queryKey[0] as string),
+      predicate: (q) => ['me', 'devices'].includes(q.queryKey[0] as string),
     });
-    await Promise.all([
-      refetchMe(),
-      refetchDevices(),
-      primaryDevice ? refetchToday() : Promise.resolve(),
-      primaryDevice ? refetchHistory() : Promise.resolve(),
-    ]);
+    await Promise.all([refetchMe(), refetchDevices()]);
   };
 
-  // Relay toggle 
-  //
-  // Flow:
-  //   1. Publish ON/OFF to relay/command via MQTT (QoS 1, broker ACK).
-  //   2. Set device as "toggling" (spinner on RelayRow).
-  //   3. Device acts, publishes confirmed state to relay/state topic.
-  //   4. _handleMessage in mqtt-client.ts writes it into useDeviceStateStore.
-  //   5. relayIsOn() below reads from the store → RelayRow re-renders.
-  //   6. useEffect below sees the confirmed state and clears the toggling flag.
-  //
-  // No arbitrary timeout, no polling. The state is always what the device said.
-
-  const relayMutation = useMutation({
-    mutationFn: async ({ deviceId, nextState }: { deviceId: string; nextState: boolean }) => {
-      await publishRelayCommand(deviceId, nextState ? 'ON' : 'OFF');
-    },
-    onMutate: ({ deviceId }) => {
-      setTogglingDeviceIds((prev) => new Set(prev).add(deviceId));
-    },
-    onError: (err, { deviceId }) => {
-      console.error('[relay] publish failed:', err);
-      setTogglingDeviceIds((prev) => {
-        const next = new Set(prev);
-        next.delete(deviceId);
-        return next;
-      });
-    },
-    // onSettled deliberately left out — clearing happens when the
-    // relay/state confirmation arrives (see useEffect below).
-  });
-
-  // Clear toggling state for any device whose relay/state has been confirmed.
-  // This runs whenever the live store updates, which happens every time
-  // a relay/state message is received from the broker.
-  useEffect(() => {
-    setTogglingDeviceIds((prev) => {
-      if (prev.size === 0) return prev;
-      const next = new Set(prev);
-      prev.forEach((deviceId) => {
-        if (liveDeviceState[deviceId]?.relayState != null) {
-          next.delete(deviceId);
-        }
-      });
-      return next.size === prev.size ? prev : next;
-    });
-  }, [liveDeviceState]);
-
-  const handleToggleRelay = (deviceId: string, currentRelayOn: boolean) => {
-    relayMutation.mutate({ deviceId, nextState: !currentRelayOn });
-  };
-
-  // Derive relay state: prefer live MQTT confirmation, fall back to
-  // last-known state from the REST device list (accurate at load time).
-  const relayIsOn = (deviceId: string, fallback: boolean): boolean => {
-    const confirmed = liveDeviceState[deviceId]?.relayState;
-    if (confirmed != null) return confirmed.state === 'ON';
-    return fallback;
-  };
-
-  // Live current power from MQTT — updates every ~10s as readings arrive.
-  // Falls back to todayEnergy.peak_power (REST) until the first MQTT message.
-  const livePower = primaryDevice
-    ? (liveDeviceState[primaryDevice.device_id]?.telemetry?.power ?? null)
-    : null;
-
-  // ── Logout ──────────────────────────────────────────────────────────────────
+  // Logout
   const logoutMutation = useMutation({
     mutationFn: logoutUser,
     onSuccess: () => {
@@ -231,11 +239,10 @@ export default function HomeScreen() {
   return (
     <View className="flex-1 bg-secondary dark:bg-background">
 
-      {/* Top bar */}
       <HStack className="items-center justify-between border-b border-border bg-card px-5 pb-3 pt-14">
         <HStack className="items-center gap-3">
           <View className="h-9 w-9 items-center justify-center rounded-xl bg-primary">
-            <Zap size={18} className="text-primary" strokeWidth={2.5} />
+            <Zap size={18} className='text-primary' strokeWidth={2.5} />
           </View>
           <VStack className="gap-0">
             <Text className="text-[17px] font-extrabold text-foreground">SmartPlug</Text>
@@ -248,7 +255,6 @@ export default function HomeScreen() {
             <Bell size={20} color="#171717" />
             <View className="absolute right-2 top-2 h-2 w-2 rounded-full bg-destructive" />
           </Pressable>
-
           <Pressable
             className="h-10 w-10 items-center justify-center rounded-xl bg-secondary"
             onPress={() => logoutMutation.mutate()}
@@ -277,122 +283,99 @@ export default function HomeScreen() {
         <VStack className="gap-0.5 px-1">
           <Heading size="xl" className="text-foreground">Hello, {firstName}</Heading>
           <Text className="text-[13px] text-muted-foreground">
-            {devices.length === 0
-              ? 'No devices registered yet.'
-              : offlineCount === 0
-                ? 'System is operating normally.'
-                : `${offlineCount} device${offlineCount > 1 ? 's' : ''} offline.`}
+            {isLoadingDevices
+              ? 'Loading your system...'
+              : isErrorDevices
+                ? 'System offline.'
+                : devices.length === 0
+                  ? 'Register your first device to get started.'
+                  : offlineCount === 0
+                    ? 'All devices are operating normally.'
+                    : `${offlineCount} device${offlineCount > 1 ? 's' : ''} offline.`}
           </Text>
         </VStack>
 
-        {/* System Overview */}
-        <Card size="sm" className="w-full rounded-2xl">
-          <VStack className="gap-3">
-            <HStack className="items-center justify-between">
-              <Text className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                System Overview
-              </Text>
-              <Badge className={`rounded-full ${offlineCount === 0 ? 'bg-success' : 'bg-warning'}`}>
-                <BadgeText>{offlineCount === 0 ? 'Optimal' : 'Attention'}</BadgeText>
-              </Badge>
-            </HStack>
+        {!isLoadingDevices && !isErrorDevices && devices.length > 0 && (
+          <Card size="sm" className="w-full rounded-2xl">
             <VStack className="gap-3">
+              <HStack className="items-center justify-between">
+                <Text className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                  Fleet Overview
+                </Text>
+                <Badge
+                  className={`rounded-full ${offlineCount === 0 ? 'bg-success' : 'bg-warning'}`}
+                >
+                  <BadgeText>{offlineCount === 0 ? 'Optimal' : 'Attention'}</BadgeText>
+                </Badge>
+              </HStack>
+
               <HStack className="gap-3">
-                {/* Current power from live MQTT reading */}
-                <MetricCard
-                  label="Current Load"
-                  value={livePower != null ? livePower.toFixed(1) : '—'}
-                  unit="W"
-                />
-                {/* Today's kWh from REST daily summary (pull-to-refresh) */}
-                <MetricCard
-                  label="Energy Today"
-                  value={todayEnergy ? todayEnergy.kwh_consumed.toFixed(2) : '—'}
-                  unit="kWh"
-                />
-              </HStack>
-              {/* NEW: Estimated Cost */}
-              <MetricCard
-                label="Est. Cost"
-                value={
-                  todayEnergy?.estimated_cost != null
-                    ? `₦${(todayEnergy.estimated_cost / 100).toFixed(2)}`
-                    : '—'
-                }
-                unit=""
-              />
-            </VStack>
-          </VStack>
-        </Card>
+                <VStack className="flex-1 gap-1 rounded-xl border border-border bg-secondary p-3">
+                  <HStack className="items-center gap-1.5">
+                    <CheckCircle2 size={14} color="#10b981" />
+                    <Text className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                      Online
+                    </Text>
+                  </HStack>
+                  <Text className="text-2xl font-black text-foreground">{onlineCount}</Text>
+                </VStack>
 
-        {/* Device Status */}
-        <Card size="sm" className="w-full rounded-2xl">
-          <VStack className="gap-3">
-            <Text className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-              Device Status
-            </Text>
-            <VStack className="gap-2">
-              <HStack className="items-center justify-between rounded-xl border border-border bg-secondary px-4 py-3.5">
-                <HStack className="items-center gap-2.5">
-                  <CheckCircle2 size={17} color="#10b981" />
-                  <Text className="text-[13px] text-foreground">Online Devices</Text>
+                <VStack className="flex-1 gap-1 rounded-xl border border-border bg-secondary p-3">
+                  <HStack className="items-center gap-1.5">
+                    <WifiOff size={14} color="#9ca3af" />
+                    <Text className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                      Offline
+                    </Text>
+                  </HStack>
+                  <Text className="text-2xl font-black text-foreground">{offlineCount}</Text>
+                </VStack>
+
+                <VStack className="flex-1 gap-1 rounded-xl border border-border bg-secondary p-3">
+                  <HStack className="items-center gap-1.5">
+                    <PlugZap size={14} color="#171717" />
+                    <Text className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                      Active
+                    </Text>
+                  </HStack>
+                  <Text className="text-2xl font-black text-foreground">{activeRelayCount}</Text>
+                </VStack>
+              </HStack>
+
+              {onlineCount > 0 && (
+                <HStack className="items-center justify-between rounded-xl border border-border bg-secondary px-4 py-3">
+                  <Text className="text-[13px] text-muted-foreground">Total Current Load</Text>
+                  <Text className="text-[15px] font-bold text-foreground">
+                    {totalLivePower.toFixed(1)} W
+                  </Text>
                 </HStack>
-                <Text className="text-[15px] font-bold text-foreground">{onlineCount}</Text>
-              </HStack>
-              <HStack className="items-center justify-between rounded-xl border border-border bg-secondary px-4 py-3.5">
-                <HStack className="items-center gap-2.5">
-                  <CircleX size={17} color="#9ca3af" />
-                  <Text className="text-[13px] text-foreground">Offline Devices</Text>
-                </HStack>
-                <Text className="text-[15px] font-bold text-foreground">{offlineCount}</Text>
-              </HStack>
-            </VStack>
-          </VStack>
-        </Card>
-
-        {/* Weekly chart (REST, 7-day history) */}
-        <Card size="sm" className="w-full rounded-2xl">
-          <WeeklyBars data={weeklyData} />
-        </Card>
-
-        {/* Relay Control */}
-        <Card size="sm" className="w-full rounded-2xl">
-          <VStack className="gap-3">
-            <HStack className="items-center justify-between">
-              <Text className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                Relay Control
-              </Text>
-              <HStack className="items-center gap-1.5">
-                <PlugZap size={14} color="#171717" />
-                <Text className="text-[10px] font-bold uppercase tracking-wider text-foreground">
-                  {devices.filter((d) => relayIsOn(d.device_id, d.relay_state)).length} Active
-                </Text>
-              </HStack>
-            </HStack>
-            <VStack className="gap-2.5">
-              {devices.length === 0 ? (
-                <Text className="py-2 text-center text-[13px] text-muted-foreground">
-                  No devices registered yet.
-                </Text>
-              ) : (
-                devices.map((device) => {
-                  const isOn = relayIsOn(device.device_id, device.relay_state);
-                  const isToggling = togglingDeviceIds.has(device.device_id);
-                  return (
-                    <RelayRow
-                      key={device.device_id}
-                      name={device.name}
-                      relay={device.device_id}
-                      active={isOn}
-                      isToggling={isToggling}
-                      onToggle={() => handleToggleRelay(device.device_id, isOn)}
-                    />
-                  );
-                })
               )}
             </VStack>
-          </VStack>
-        </Card>
+          </Card>
+        )}
+
+        <VStack className="gap-2">
+          <Text className="px-1 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+            {devices.length > 0 ? 'Your Devices' : ''}
+          </Text>
+
+          {isLoadingDevices ? (
+            <DeviceSkeleton />
+          ) : isErrorDevices ? (
+            <ErrorState onRetry={refetchDevices} />
+          ) : devices.length === 0 ? (
+            <EmptyState />
+          ) : (
+            devices.map((device) => (
+              <DeviceCard
+                key={device.device_id}
+                device={device}
+                livePower={getLivePower(device.device_id)}
+                liveRelayOn={getLiveRelay(device.device_id, device.relay_state)}
+                onPress={() => router.push(`/(app)/device/${device.device_id}`)}
+              />
+            ))
+          )}
+        </VStack>
       </ScrollView>
     </View>
   );
