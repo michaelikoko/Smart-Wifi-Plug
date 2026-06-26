@@ -77,12 +77,12 @@ static void mqtt_event_handler(void *args, esp_event_base_t base,
 
         // Publish online status
         // Build status payload with timestamp
-        char status_payload[64];
-        snprintf(status_payload, sizeof(status_payload),
+        char online_status_payload[64];
+        snprintf(online_status_payload, sizeof(online_status_payload),
                  "{\"status\":\"online\",\"ts\":%lld}", (long long)sntp_get_epoch());
 
         esp_mqtt_client_publish(client, MQTT_TOPIC_PUB_DEVICE_STATUS,
-                                status_payload, 0, 1, 1);
+                                online_status_payload, 0, 1, 1);
         // esp_mqtt_client_publish(client, MQTT_TOPIC_PUB_DEVICE_STATUS, "{\"status\":\"online\"}", 0, 1, 1);
 
         // Subscribe to relay command topic
@@ -94,8 +94,14 @@ static void mqtt_event_handler(void *args, esp_event_base_t base,
         break;
 
     case MQTT_EVENT_DISCONNECTED:
-        ESP_LOGW(TAG, "Disconnected");
+        ESP_LOGW(TAG, "Disconnected. Publishing offline status");
         is_mqtt_connected = false;
+        char offline_status_payload[64];
+        snprintf(offline_status_payload, sizeof(offline_status_payload),
+                 "{\"status\":\"offline\",\"ts\":%lld}", (long long)sntp_get_epoch());
+
+        esp_mqtt_client_publish(client, MQTT_TOPIC_PUB_DEVICE_STATUS,
+                                offline_status_payload, 0, 1, 1);
         break;
 
     case MQTT_EVENT_DATA:

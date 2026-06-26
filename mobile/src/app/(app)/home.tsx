@@ -26,17 +26,20 @@ function DeviceCard({
   device,
   livePower,
   liveRelayOn,
+  liveIsOnline,
   onPress,
 }: {
   device: DeviceResponse;
   livePower: number | null;
   liveRelayOn: boolean;
+  liveIsOnline: boolean;
   onPress: () => void;
 }) {
-  const powerStr = livePower != null ? `${livePower.toFixed(1)} W` : 'loading...';
+  const powerStr = livePower != null ? `${livePower.toFixed(1)} W` : device.is_online ? 'Loading...' : 'Offline';
 
   return (
     <Pressable onPress={onPress} android_ripple={{ color: '#e5e5e5' }}>
+
       <Card size="sm" className="w-full rounded-2xl">
         <HStack className="items-center gap-4">
           <View className="relative">
@@ -46,7 +49,7 @@ function DeviceCard({
             <View
               className={[
                 'absolute -right-1 -top-1 h-3 w-3 rounded-full border-2 border-card',
-                device.is_online ? 'bg-emerald-500' : 'bg-muted-foreground',
+                liveIsOnline ? 'bg-emerald-500' : 'bg-muted-foreground', // <-- USE IT HERE
               ].join(' ')}
             />
           </View>
@@ -184,8 +187,16 @@ export default function HomeScreen() {
     subscribeToDevices(devices.map((d) => d.device_id));
   }, [devices]);
 
+  // Live online status
+  const getLiveOnline = (deviceId: string, fallback: boolean): boolean => {
+    const live = liveDeviceState[deviceId]?.isOnline;
+    return live != null ? live : fallback;
+  };
+
   // Fleet counts
-  const onlineCount = devices.filter((d) => d.is_online).length;
+  //const onlineCount = devices.filter((d) => d.is_online).length;
+  //const offlineCount = devices.length - onlineCount;
+  const onlineCount = devices.filter((d) => getLiveOnline(d.device_id, d.is_online)).length;
   const offlineCount = devices.length - onlineCount;
 
   // Helpers to resolve live state from MQTT store, falling back to REST
@@ -371,6 +382,7 @@ export default function HomeScreen() {
                 device={device}
                 livePower={getLivePower(device.device_id)}
                 liveRelayOn={getLiveRelay(device.device_id, device.relay_state)}
+                liveIsOnline={getLiveOnline(device.device_id, device.is_online)} // <-- PASS IT HERE
                 onPress={() => router.push(`/(app)/device/${device.device_id}`)}
               />
             ))

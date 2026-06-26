@@ -1,6 +1,7 @@
 import mqtt, { MqttClient } from 'mqtt';
 import { useDeviceStateStore } from '../store/device-state-store';
 import type { LiveTelemetry, LiveRelayState } from '../store/device-state-store';
+import { CurrentEnergyResponse } from '../api/telemetry-api';
 
 const MQTT_WS_URL = 'ws://broker.hivemq.com:8000/';
 
@@ -125,8 +126,15 @@ function _handleMessage(topic: string, payloadBuffer: Buffer) {
 
   if (subtopic === 'be-online-status') {
     // Backend payload: { isOnline: true|false }
-    console.log(`[mqtt] device ${deviceId} online status:`, data);
+    console.log(`[mqtt] be-online-status ${deviceId} online status:`, data);
     useDeviceStateStore.getState().setOnlineStatus(deviceId, Boolean(data.is_online));
+    return;
+  }
+
+  if (subtopic === 'be-daily-summary') {
+    // Backend payload: CurrentEnergyResponse
+    console.log(`[mqtt] be-daily-summary ${deviceId} data:`, data);
+    useDeviceStateStore.getState().setCurrentEnergyReadings(deviceId, data as any as CurrentEnergyResponse);
     return;
   }
 }
@@ -137,6 +145,7 @@ function _subscribeTopicsForDevices(deviceIds: string[], c: MqttClient) {
     `smartplug/${id}/telemetry`,
     `smartplug/${id}/relay/state`,
     `smartplug/${id}/be-online-status`, // Endpoint that only the server publishes to indicate online/offline status 
+    `smartplug/${id}/be-daily-summary` // Endpoint that only the server publishes to indicate daily energy summary
   ]);
 
   c.subscribe(topics, { qos: 1 }, (err) => {

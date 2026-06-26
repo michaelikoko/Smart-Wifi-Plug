@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import type { CurrentEnergyResponse } from '../api/telemetry-api'
 
 export interface LiveTelemetry {
   voltage: number;
@@ -13,6 +14,7 @@ export interface LiveTelemetry {
   receivedAt: number; // Date.now() when this was processed client-side
 }
 
+// Use Current Energy Response as the type for live energy readings, since it has the same fields
 
 export interface LiveRelayState {
   state: 'ON' | 'OFF';
@@ -25,6 +27,7 @@ interface DeviceStateEntry {
   telemetry: LiveTelemetry | null;
   relayState: LiveRelayState | null;
   isOnline: boolean | null; // null = unknown, true = online, false = offline
+  currentEnergyReadings: CurrentEnergyResponse | null; // Summary of today's energy readings, updated every 5 minutes
 }
 
 interface DeviceStateStore {
@@ -32,6 +35,7 @@ interface DeviceStateStore {
 
   setTelemetry: (deviceId: string, data: LiveTelemetry) => void;
   setOnlineStatus: (deviceId: string, isOnline: boolean) => void;
+  setCurrentEnergyReadings: (deviceId: string, data: CurrentEnergyResponse) => void;
   setRelayState: (deviceId: string, data: LiveRelayState) => void;
   clearDevice: (deviceId: string) => void;
   clearAll: () => void;
@@ -41,6 +45,7 @@ const DEFAULT_ENTRY: DeviceStateEntry = {
   telemetry: null,
   relayState: null,
   isOnline: null,
+  currentEnergyReadings: null,
 };
 
 export const useDeviceStateStore = create<DeviceStateStore>((set) => ({
@@ -62,6 +67,17 @@ export const useDeviceStateStore = create<DeviceStateStore>((set) => ({
       devices: {
         ...state.devices,
         [deviceId]: { ...(state.devices[deviceId] ?? DEFAULT_ENTRY), isOnline },
+      },
+    })),
+
+  setCurrentEnergyReadings: (deviceId, data) =>
+    set((state) => ({
+      devices: {
+        ...state.devices,
+        [deviceId]: {
+          ...(state.devices[deviceId] ?? DEFAULT_ENTRY),
+          currentEnergyReadings: data,
+        },
       },
     })),
 

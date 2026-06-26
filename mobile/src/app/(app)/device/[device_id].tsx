@@ -87,6 +87,10 @@ export default function DeviceDetailScreen() {
     const telemetry = liveState?.telemetry ?? null;
     const relayConfirmed = liveState?.relayState ?? null;
 
+    // Live isOnline staus and currentEnergyReadings
+    const isOnline = liveState?.isOnline ?? null; // null = unknown, true = online, false = offline
+    const currentEnergyReadings = liveState?.currentEnergyReadings ?? null; // null = unknown, CurrentEnergyResponse = latest summary
+
     const [isToggling, setIsToggling] = useState(false);
 
     // Pull device metadata from the already-fetched devices query cache.
@@ -103,6 +107,7 @@ export default function DeviceDetailScreen() {
         ? relayConfirmed.state === 'ON'
         : (device?.relay_state ?? false);
 
+    /*
     // Today's energy
     const {
         data: todayEnergy,
@@ -115,6 +120,7 @@ export default function DeviceDetailScreen() {
         staleTime: 30_000,
         retry: (failureCount, error) => (!is404(error) && failureCount < 2),
     });
+    */
 
     // 7-day energy history
     const {
@@ -139,7 +145,8 @@ export default function DeviceDetailScreen() {
         }));
 
     // Pull-to-refresh — only REST data, MQTT is always live
-    const isRefetching = isRefetchingToday || isRefetchingHistory;
+    //const isRefetching = isRefetchingToday || isRefetchingHistory;
+    const isRefetching =  isRefetchingHistory;
 
     const onRefresh = async () => {
         await queryClient.invalidateQueries({
@@ -147,7 +154,8 @@ export default function DeviceDetailScreen() {
                 ['energy-today', 'energy-history'].includes(q.queryKey[0] as string) &&
                 q.queryKey[1] === device_id,
         });
-        await Promise.all([refetchToday(), refetchHistory()]);
+        //await Promise.all([refetchToday(), refetchHistory()]);
+        await Promise.all([ refetchHistory()]);
     };
 
     // Relay toggle
@@ -197,9 +205,9 @@ export default function DeviceDetailScreen() {
 
                     {device && (
                         <Badge
-                            className={`rounded-full ${device.is_online ? 'bg-success' : 'bg-destructive'}`}
+                            className={`rounded-full ${isOnline ? 'bg-success' : 'bg-destructive'}`}
                         >
-                            <BadgeText>{device.is_online ? 'Online' : 'Offline'}</BadgeText>
+                            <BadgeText>{isOnline ? 'Online' : 'Offline'}</BadgeText>
                         </Badge>
                     )}
                 </HStack>
@@ -232,7 +240,7 @@ export default function DeviceDetailScreen() {
 
                         <Pressable
                             onPress={handleRelayToggle}
-                            disabled={isToggling || !device?.is_online}
+                            disabled={isToggling || !isOnline}
                             className={['rounded-2xl px-5 py-3.5 flex-row items-center gap-2 disabled:bg-muted disabled:opacity-60',
                                 isToggling ? 'opacity-60 bg-muted' :
                                     relayIsOn ? 'bg-success' : 'bg-destructive',
@@ -346,7 +354,10 @@ export default function DeviceDetailScreen() {
                             <Text className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
                                 Today's Usage
                             </Text>
-                            <Text className="text-[11px] text-muted-foreground">Pull to refresh</Text>
+                            <HStack className="items-center gap-1">
+                                <CircleDot size={10} color="#10b981" />
+                                <Text className="text-[10px] text-emerald-600">Live</Text>
+                            </HStack>
                         </HStack>
 
                         <HStack className="gap-2">
@@ -356,7 +367,7 @@ export default function DeviceDetailScreen() {
                                 </Text>
                                 <HStack className="items-end gap-1">
                                     <Text className="text-2xl font-black text-foreground">
-                                        {todayEnergy ? todayEnergy.kwh_consumed.toFixed(3) : '—'}
+                                        {currentEnergyReadings ? currentEnergyReadings.kwh_consumed.toFixed(3) : '—'}
                                     </Text>
                                     <Text className="mb-0.5 text-[12px] font-semibold text-muted-foreground">kWh</Text>
                                 </HStack>
@@ -368,18 +379,18 @@ export default function DeviceDetailScreen() {
                                 </Text>
                                 <HStack className="items-end gap-1">
                                     <Text className="text-2xl font-black text-foreground">
-                                        {todayEnergy ? todayEnergy.peak_power.toFixed(1) : '—'}
+                                        {currentEnergyReadings ? currentEnergyReadings.peak_power.toFixed(1) : '—'}
                                     </Text>
                                     <Text className="mb-0.5 text-[12px] font-semibold text-muted-foreground">W</Text>
                                 </HStack>
                             </VStack>
                         </HStack>
 
-                        {todayEnergy?.estimated_cost != null && (
+                        {currentEnergyReadings?.estimated_cost != null && (
                             <HStack className="items-center justify-between rounded-xl border border-border bg-secondary px-4 py-3">
                                 <Text className="text-[13px] text-muted-foreground">Estimated Cost</Text>
                                 <Text className="text-[15px] font-bold text-foreground">
-                                    ₦{(todayEnergy.estimated_cost / 100).toFixed(2)}
+                                    ₦{(currentEnergyReadings.estimated_cost / 100).toFixed(2)}
                                 </Text>
                             </HStack>
                         )}
