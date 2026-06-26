@@ -3,7 +3,7 @@ from gmqtt import Client as MQTTClient
 from typing import Any
 import logging
 from datetime import datetime, timezone, date as date_type
-from schemas.telemetry import TelemetryPayload
+from schemas.telemetry import TelemetryPayload, CurrentEnergyResponse
 from db.session import SessionDep, get_session, engine
 from models.telemetry import TelemetryReading, DeviceDailySummary
 from sqlmodel import select, Session, col
@@ -63,6 +63,42 @@ def _resolve_timestamp(ts: int) -> int:
 
     return ts
 
+def _publish_online_status(device_id: str, is_online: bool):
+    """Helper to broadcast definitive online status to mobile clients."""
+    logger.info("Publishing online status — device=%s is_online=%s", device_id, is_online)
+    topic = f"smartplug/{device_id}/be-online-status"
+    payload = json.dumps({"is_online": is_online})
+    fast_mqtt.publish(topic, payload, qos=1, retain=True)
+
+def _publish_daily_summary(device_id: str, summary: DeviceDailySummary, billing_rate: int | None):
+    """Helper to broadcast the full CurrentEnergyResponse to mobile clients."""
+    logger.info("Publishing daily summary — device=%s date=%s", device_id, summary.date)
+    estimated_cost = None
+    if billing_rate is not None and summary.kwh_consumed is not None:
+        estimated_cost = int(summary.kwh_consumed * billing_rate)
+
+    # Build the full Pydantic model
+    response = CurrentEnergyResponse(
+        device_id=summary.device_id,
+        date=summary.date,
+        energy_first=summary.energy_first,
+        energy_first_timestamp=summary.energy_first_timestamp,
+        energy_last=summary.energy_last,
+        energy_last_timestamp=summary.energy_last_timestamp,
+        kwh_consumed=summary.kwh_consumed,
+        peak_power=summary.peak_power,
+        peak_power_timestamp=summary.peak_power_timestamp,
+        updated_at=summary.updated_at,
+        created_at=summary.created_at,
+        estimated_cost=estimated_cost
+    )
+
+    topic = f"smartplug/{device_id}/be-daily-summary"
+    
+    # model_dump_json() magically handles datetime serialization!
+    payload = response.model_dump_json() 
+    
+    fast_mqtt.publish(topic, payload, qos=1, retain=True)
 
 # def _resolve_timestamp(ts: int) -> int:
 #    """
@@ -100,7 +136,7 @@ def _save_telemetry_to_db(
             .where(Device.is_enabled == True)  # noqa: E712
         ).first()
 
-        if not device:
+        if not device or device.user is None:
             # Device not registered in the database, log a warning and return
             logger.warning("Telemetry received for unregistered or disabled device: %s", device_id)
             return
@@ -186,6 +222,12 @@ def _save_telemetry_to_db(
         device.relay_state = bool(payload.relay)  # ← Update relay state
         device.is_online = True  # Device is online if we're receiving telemetry
         session.add(device)
+
+        # Broadcast the online status to mobile clients - Maybe on publish on transition to avoid spamming
+        _publish_online_status(device_id, True)
+
+        # Publish daily summary to mobile clients
+        _publish_daily_summary(device_id, current_summary, device.user.billing_rate)
         logger.info(
             "Updated device — device=%s last_seen=%s relay=%s",
             device_id,
@@ -201,7 +243,6 @@ def _save_telemetry_to_db(
 
 
 def register_mqtt_handlers():
-
     @fast_mqtt.on_connect()
     def on_connect(client: MQTTClient, flags: int, rc: int, properties: Any):
         logger.info("MQTT broker connected — rc=%d", rc)
@@ -249,6 +290,55 @@ def register_mqtt_handlers():
         properties: Any,
     ):
         logger.info("Status — topic=%s payload=%s", topic, payload.decode())
+        device_id = _extract_device_id(topic)
+        if not device_id:
+            logger.error("Failed to extract device_id from topic: %s", topic)
+            return
+        
+        try:
+            data = json.loads(payload.decode("utf-8"))
+        except (json.JSONDecodeError, UnicodeDecodeError) as e:
+            logger.error("Status JSON decode error: %s", e)
+            return
+        
+        status = data.get("status")
+        if status is None:
+            logger.error("Missing 'status' field in status payload")
+            return
+        
+        if status == "offline":
+            is_online = False
+        elif status == "online":
+            is_online = True
+        else:
+            logger.error("Invalid 'status' value in payload: %s", status)
+            return
+
+        try:
+            with Session(engine) as session:
+                device = session.exec(
+                    select(Device)
+                    .where(Device.device_id == device_id)
+                    .where(Device.is_enabled == True)  # noqa: E712
+                ).first()
+                if device:
+                    device.is_online = is_online
+                    if is_online:
+                        device.last_seen = datetime.now(timezone.utc)
+                    session.add(device)
+                    session.commit()
+
+                    # Broadcast the online status to mobile clients
+                    _publish_online_status(device_id, is_online)
+                    logger.info(
+                        "Device status updated — device=%s is_online=%s", device_id, is_online
+                    )
+                else:
+                    logger.warning(
+                        "Status received for unregistered or disabled device: %s", device_id
+                    )
+        except Exception as e:
+            logger.error("Failed to update device status: %s", e)
 
     @fast_mqtt.subscribe("smartplug/+/relay/state", qos=1)
     async def on_relay_state(
@@ -290,6 +380,9 @@ def register_mqtt_handlers():
                     device.last_seen = datetime.now(timezone.utc)
                     session.add(device)
                     session.commit()
+
+                    # Broadcast the online status to mobile clients
+                    _publish_online_status(device_id, True)
                     logger.info(
                         "Relay state updated — device=%s state=%s", device_id, state
                     )
@@ -338,6 +431,9 @@ async def start_staleness_sweep():
                 for device in stale_devices:
                     device.is_online = False
                     session.add(device)
+
+                    # Broadcast the online status to mobile clients
+                    _publish_online_status(device.device_id, False)
                     logger.info(
                         "Marking device offline (stale) — device=%s last_seen=%s",
                         device.device_id,

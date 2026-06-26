@@ -13,7 +13,7 @@ if not POSTGRES_URL:
 
 connect_args = {"check_same_thread": False}
 #engine = create_engine(SQLITE_URL, connect_args=connect_args)
-engine = create_engine(POSTGRES_URL, echo=True, pool_pre_ping=True)
+engine = create_engine(POSTGRES_URL, echo=False, pool_pre_ping=True)
 
 def create_db_and_tables():
     """
