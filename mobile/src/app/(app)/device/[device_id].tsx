@@ -1,25 +1,27 @@
-import { useEffect, useState } from 'react';
-import { ScrollView, View, RefreshControl, Pressable } from 'react-native';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import {
-    ArrowLeft, Activity, Battery, CircleDot,
+    Activity,
+    ArrowLeft,
+    Battery, CircleDot,
     Gauge, Radio, ToggleLeft, ToggleRight, Wifi, Zap,
 } from 'lucide-react-native';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useEffect, useState } from 'react';
+import { Pressable, RefreshControl, ScrollView, View } from 'react-native';
 
-import { Card } from '@/components/ui/card';
-import { VStack } from '@/components/ui/vstack';
-import { HStack } from '@/components/ui/hstack';
-import { Heading } from '@/components/ui/heading';
-import { Text } from '@/components/ui/text';
 import { Badge, BadgeText } from '@/components/ui/badge';
+import { Card } from '@/components/ui/card';
+import { Heading } from '@/components/ui/heading';
+import { HStack } from '@/components/ui/hstack';
 import { Spinner } from '@/components/ui/spinner';
+import { Text } from '@/components/ui/text';
+import { VStack } from '@/components/ui/vstack';
 
 import { WeeklyBars, type WeeklyBarDatum } from '@/components/app-ui';
-import { useDeviceStateStore } from '../../../store/device-state-store';
 import { listDevices } from '../../../api/devices-api';
-import { getTodayEnergy, getEnergyHistory, is404 } from '../../../api/telemetry-api';
+import { getEnergyHistory, is404 } from '../../../api/telemetry-api';
 import { publishRelayCommand } from '../../../lib/mqtt-client';
+import { useDeviceStateStore } from '../../../store/device-state-store';
 
 // Helpers 
 function dayLabel(dateStr: string): string {
@@ -28,6 +30,12 @@ function dayLabel(dateStr: string): string {
         weekday: 'short',
         timeZone: 'UTC',
     });
+}
+
+function addUtcDays(dateStr: string, days: number): string {
+    const date = new Date(`${dateStr}T00:00:00Z`);
+    date.setUTCDate(date.getUTCDate() + days);
+    return date.toISOString().slice(0, 10);
 }
 
 function rssiLabel(rssi: number): { label: string; color: string } {
@@ -107,21 +115,6 @@ export default function DeviceDetailScreen() {
         ? relayConfirmed.state === 'ON'
         : (device?.relay_state ?? false);
 
-    /*
-    // Today's energy
-    const {
-        data: todayEnergy,
-        refetch: refetchToday,
-        isRefetching: isRefetchingToday,
-    } = useQuery({
-        queryKey: ['energy-today', device_id],
-        queryFn: () => getTodayEnergy(device_id),
-        enabled: !!device_id,
-        staleTime: 30_000,
-        retry: (failureCount, error) => (!is404(error) && failureCount < 2),
-    });
-    */
-
     // 7-day energy history
     const {
         data: energyHistory,
@@ -135,17 +128,36 @@ export default function DeviceDetailScreen() {
         retry: (failureCount, error) => (!is404(error) && failureCount < 2),
     });
 
-    const weeklyData: WeeklyBarDatum[] = (energyHistory ?? [])
-        .slice()
-        .reverse()
-        .map((row) => ({
-            day: dayLabel(row.date),
-            kwh: row.kwh_consumed,
-            costKobo: row.estimated_cost ?? null,
-        }));
+    const weeklyData: WeeklyBarDatum[] = (() => {
+        const todayDate = new Date().toISOString().slice(0, 10);
+        const windowDates = Array.from({ length: 7 }, (_, idx) => addUtcDays(todayDate, idx - 6));
+
+        const historyByDate = new Map(
+            (energyHistory ?? []).map((row) => [row.date, row])
+        );
+
+        if (currentEnergyReadings) {
+            historyByDate.set(currentEnergyReadings.date, {
+                device_id: currentEnergyReadings.device_id,
+                date: currentEnergyReadings.date,
+                kwh_consumed: currentEnergyReadings.kwh_consumed,
+                peak_power: currentEnergyReadings.peak_power,
+                estimated_cost: currentEnergyReadings.estimated_cost,
+            });
+        }
+
+        return windowDates.map((date) => {
+            const row = historyByDate.get(date);
+            return {
+                day: dayLabel(date),
+                date,
+                kwh: row?.kwh_consumed ?? 0,
+                costKobo: row?.estimated_cost ?? null,
+            };
+        });
+    })();
 
     // Pull-to-refresh — only REST data, MQTT is always live
-    //const isRefetching = isRefetchingToday || isRefetchingHistory;
     const isRefetching =  isRefetchingHistory;
 
     const onRefresh = async () => {
@@ -154,7 +166,6 @@ export default function DeviceDetailScreen() {
                 ['energy-today', 'energy-history'].includes(q.queryKey[0] as string) &&
                 q.queryKey[1] === device_id,
         });
-        //await Promise.all([refetchToday(), refetchHistory()]);
         await Promise.all([ refetchHistory()]);
     };
 

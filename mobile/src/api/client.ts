@@ -22,7 +22,7 @@ import axios, {
 } from 'axios';
 import { useAuthStore } from '../store/auth-store';
 
-const BASE_URL = 'http://192.168.204.30:8000/api/v1';
+const BASE_URL = 'http://192.168.146.30:8000/api/v1';
 
 export const apiClient = axios.create({
   baseURL: BASE_URL,

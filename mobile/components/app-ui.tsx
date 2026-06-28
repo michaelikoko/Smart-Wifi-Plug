@@ -1,10 +1,10 @@
+import { HStack } from '@/components/ui/hstack';
+import { Text } from '@/components/ui/text';
+import { VStack } from '@/components/ui/vstack';
 import { useRef } from 'react';
 import { Pressable, TextInput, View, useWindowDimensions } from 'react-native';
-import { Text } from '@/components/ui/text';
-import { HStack } from '@/components/ui/hstack';
-import { VStack } from '@/components/ui/vstack';
-import { Spinner } from './ui/spinner';
 import { BarChart } from 'react-native-gifted-charts';
+import { Spinner } from './ui/spinner';
 
 
 export function OtpInput({
@@ -83,6 +83,7 @@ export function OtpInput({
 
 export interface WeeklyBarDatum {
   day: string;   // short label, e.g. "Mon"
+  date: string;  // ISO date string "YYYY-MM-DD"
   kwh: number;   // raw kWh value for this day
   costKobo: number | null; // The cost in kobo from the backend
 }
@@ -97,21 +98,30 @@ const WEEKLY_COLORS = [
 ];
 export function WeeklyBars({ data }: { data: WeeklyBarDatum[] }) {
   const { width } = useWindowDimensions();
-  const FALLBACK_DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
   const hasData = data.length > 0;
+  const formatDate = (dateStr: string) =>
+    new Intl.DateTimeFormat('en-US', {
+      month: 'short',
+      day: 'numeric',
+      timeZone: 'UTC',
+    }).format(new Date(`${dateStr}T00:00:00Z`));
+
+  const rangeLabel =
+    data.length >= 2
+      ? `${formatDate(data[0].date)} – ${formatDate(data[data.length - 1].date)}`
+      : '';
 
   // 1. Prepare data for the chart
-  const barData = FALLBACK_DAYS.map((dayLabel, idx) => {
-    const existingDay = data.find((d) => d.day === dayLabel);
-    const kwhValue = existingDay ? existingDay.kwh : 0;
-    const costValue = existingDay?.costKobo != null ? existingDay.costKobo / 100 : 0;
+  const barData = data.map((d, idx) => {
+    const costValue = d.costKobo != null ? d.costKobo / 100 : 0;
+    const dayOfMonth = new Date(`${d.date}T00:00:00Z`).getUTCDate();
 
     return {
-      label: dayLabel,
-      value: kwhValue,
+      ...d,
+      label: `${d.day}\n${dayOfMonth}`,
+      value: d.kwh,
       costFormatted: costValue > 0 ? `₦${costValue.toFixed(2)}` : '₦0.00',
-      // Maintain your alternating colors (you'll need to use your actual hex codes here)
-      frontColor: WEEKLY_COLORS[idx % WEEKLY_COLORS.length], 
+      frontColor: WEEKLY_COLORS[idx % WEEKLY_COLORS.length],
     };
   });
 
@@ -122,14 +132,19 @@ export function WeeklyBars({ data }: { data: WeeklyBarDatum[] }) {
       <Text className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
         Weekly Consumption
       </Text>
-      
+      {rangeLabel ? (
+        <Text className="text-[11px] font-semibold text-muted-foreground">
+          {rangeLabel}
+        </Text>
+      ) : null}
+
       <View className="rounded-xl border border-border bg-secondary p-4">
         {hasData ? (
           <BarChart
             data={barData}
             height={150}
             // Make the chart responsive to the card width (padding buffer)
-            width={width - 110} 
+            width={width - 110}
             barWidth={22}
             spacing={14}
             roundedTop
@@ -137,17 +152,16 @@ export function WeeklyBars({ data }: { data: WeeklyBarDatum[] }) {
             xAxisThickness={0}
             yAxisThickness={0}
             yAxisTextStyle={{ color: '#737373', fontSize: 10 }}
-            xAxisLabelTextStyle={{ color: '#737373', fontSize: 10, textAlign: 'center' }}
-            maxValue={maxKwh} // Give a 20% visual buffer at the top
+            xAxisLabelTextStyle={{ color: '#737373', fontSize: 9, textAlign: 'center' }}
+            xAxisLabelsVerticalShift={5}
+            maxValue={maxKwh}
             noOfSections={4}
-            //showLine = {true}
             yAxisExtraHeight={50}
-            // --- The Interactive Tooltip Magic ---
             renderTooltip={(item: any) => {
               return (
                 <View className="mb-2 items-center justify-center rounded-md bg-foreground px-2 py-1 shadow-lg">
                   <Text className="text-[10px] font-bold text-background">
-                    {item.value.toFixed(2)} kWh
+                    {formatDate(item.date)} · {item.value.toFixed(2)} kWh
                   </Text>
                   <Text className="text-[9px] text-muted">
                     {item.costFormatted}
