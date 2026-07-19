@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime
 from enum import Enum
 from typing import Optional, ClassVar
 from sqlmodel import Field, SQLModel, DateTime, Column, func

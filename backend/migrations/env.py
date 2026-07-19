@@ -9,6 +9,7 @@ from alembic import context
 from sqlmodel import SQLModel
 from dotenv import load_dotenv
 from models.device import Device
+from models.energy_event import EnergyEvent
 from models.otp_code import OtpCode
 from models.refresh_token import RefreshToken
 from models.telemetry import TelemetryReading, DeviceDailySummary

@@ -7,6 +7,8 @@ from schemas.telemetry import TelemetryPayload, CurrentEnergyResponse
 from db.session import SessionDep, get_session, engine
 from models.telemetry import TelemetryReading, DeviceDailySummary
 from sqlmodel import select, Session, col
+from energy_limits.enforcement import check_limits_and_get_cutoff_reason
+from models.energy_event import EnergyEvent
 import json
 from models.device import Device
 import re
@@ -100,19 +102,29 @@ def _publish_daily_summary(device_id: str, summary: DeviceDailySummary, billing_
     
     fast_mqtt.publish(topic, payload, qos=1, retain=True)
 
-# def _resolve_timestamp(ts: int) -> int:
-#    """
-#    Use the ESP32 timestamp if it looks valid (i.e. after Jan 1, 2026), otherwise use the current backend timestamp.
-#    """
-#    if ts >= _MIN_VALID_TS:
-#        return ts
-#    backend_ts = int(datetime.now(timezone.utc).timestamp())
-#    logger.warning(
-#    "Received invalid timestamp %s from device, using backend timestamp %s instead", ts,
-#    backend_ts,
-#    )
-#    return backend_ts
+# Helper: publish relay command
+def _publish_relay_command(device_id: str, state: bool):
+    """Publish a backend-initiated relay command (e.g. auto-cutoff)."""
+    topic = f"smartplug/{device_id}/relay/command"
+    payload = json.dumps({"cmd": "ON" if state else "OFF"})
+    fast_mqtt.publish(topic, payload, qos=1, retain=False)
+    logger.info("Relay command published — device=%s state=%s", device_id, state)
 
+
+def _publish_energy_event(device_id: str, event: EnergyEvent):
+    """Publish a newly created energy limit breach event to the mobile client."""
+    topic = f"smartplug/{device_id}/energy-event"
+    payload = json.dumps({
+        "id": event.id,
+        "event_type": event.event_type.value,
+        "period": event.period.value,
+        "period_key": event.period_key,
+        "kwh_at_event": event.kwh_at_event,
+        "limit_kwh": event.limit_kwh,
+        "created_at": event.created_at.isoformat() if event.created_at else None,
+    })
+    fast_mqtt.publish(topic, payload, qos=1, retain=False)
+    logger.info("Energy event published — device=%s type=%s", device_id, event.event_type.value)
 
 def _get_date(ts_epoch: int) -> date_type:
     """
@@ -235,7 +247,48 @@ def _save_telemetry_to_db(
             device.relay_state,
         )
 
-        session.commit()
+        # Energy limit enforcement
+        if device.auto_cutoff_enabled:
+            daily_kwh = current_summary.kwh_consumed or 0.0
+
+            # Compute monthly usage: sum kwh_consumed across all daily summaries this month
+            now_utc = datetime.now(timezone.utc)
+            month_start = date_type(now_utc.year, now_utc.month, 1)
+            monthly_rows = session.exec(
+                select(DeviceDailySummary)
+                .where(DeviceDailySummary.device_id == device_id)
+                .where(DeviceDailySummary.date >= month_start)
+            ).all()
+            monthly_kwh = sum(r.kwh_consumed or 0.0 for r in monthly_rows)
+
+            cutoff_reason, new_events = check_limits_and_get_cutoff_reason(
+                device=device,
+                daily_kwh=daily_kwh,
+                monthly_kwh=monthly_kwh,
+                session=session,
+            )
+
+            if cutoff_reason and device.cutoff_reason is None:
+                # First breach — cut off the device
+                device.cutoff_reason = cutoff_reason
+                device.cutoff_at = datetime.now(timezone.utc)
+                device.relay_state = False
+                session.add(device)
+                _publish_relay_command(device_id, False)
+                logger.warning(
+                    "Auto-cutoff triggered — device=%s reason=%s daily=%.3f monthly=%.3f",
+                    device_id, cutoff_reason, daily_kwh, monthly_kwh,
+                )
+            session.commit()
+
+            print("Checking events to publish")
+            print(new_events)
+            for event in new_events:
+                session.refresh(event)  # Refresh to get the auto-generated ID and timestamps
+                print("Publishing events")
+                _publish_energy_event(device_id, event)
+        # --- End energy limit enforcement ---
+
     except Exception as e:
         logger.error("Error saving telemetry to DB: %s", e)
         session.rollback()
@@ -374,6 +427,9 @@ def register_mqtt_handlers():
                 ).first()
                 if device:
                     device.relay_state = state == "ON"
+                    #if state == "ON":
+                    #    device.cutoff_reason = None # Clear cutoff reason 
+                    #    device.cutoff_at = None
                     device.is_online = (
                         True  # Device is online if we're receiving relay state updates
                     )

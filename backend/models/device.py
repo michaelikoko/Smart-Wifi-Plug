@@ -5,6 +5,7 @@ from datetime import datetime
 if TYPE_CHECKING:
     from models.user import User
     from models.telemetry import TelemetryReading, DeviceDailySummary
+    from models.energy_event import EnergyEvent
 
 
 class Device(SQLModel, table=True):
@@ -31,6 +32,14 @@ class Device(SQLModel, table=True):
     relay_state: bool = False
     is_enabled: bool = Field(default=False, nullable=False)
     is_online: bool = Field(default=False)
+    daily_limit_kwh: Optional[float] = None
+    monthly_limit_kwh: Optional[float] = None
+    auto_cutoff_enabled: bool = Field(default=False, nullable=False)
+    cutoff_reason: Optional[str] = None
+    cutoff_at: Optional[datetime] = Field(
+        default=None,
+        sa_column=Column(DateTime(timezone=True), nullable=True),
+    )
     last_seen: Optional[datetime] = Field(
         default=None,
         sa_column=Column(DateTime(timezone=True), nullable=True),
@@ -62,3 +71,4 @@ class Device(SQLModel, table=True):
         back_populates="device",
         sa_relationship_kwargs={"cascade": "all, delete"}
     )
+    energy_events: list["EnergyEvent"] = Relationship(back_populates="device")

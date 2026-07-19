@@ -4,7 +4,7 @@ from sqlmodel import select
 from db.session import SessionDep
 from auth.dependencies import CurrentActiveUser
 from models.device import Device
-from schemas.device import DeviceRegisterRequest, DeviceResponse
+from schemas.device import DeviceRegisterRequest, DeviceResponse, UpdateDeviceLimitsRequest
 
 router = APIRouter(prefix="/devices", tags=["Devices"])
 
@@ -38,10 +38,7 @@ def register_device(
         )
 
     if current_user.id is None:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="User ID is missing from the database record.",
-        )
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="User ID is missing from the database record.")
 
     device.user_id = current_user.id
     device.name = body.name
@@ -84,10 +81,7 @@ def get_device(
     Get a single device by device_id.
     """
     if current_user.id is None:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="User ID is missing from the database record.",
-        )
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="User ID is missing from the database record.")
 
     device = _get_owned_device(device_id, current_user.id, session)
     return device
@@ -108,12 +102,42 @@ def update_device(
     Update device name.
     """
     if current_user.id is None:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="User ID is missing from the database record.",
-        )
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="User ID is missing from the database record.")
+
     device = _get_owned_device(device_id, current_user.id, session)
     device.name = body.name
+    session.add(device)
+    session.commit()
+    session.refresh(device)
+    return device
+
+
+@router.patch(
+    "/{device_id}/limits",
+    response_model=DeviceResponse,
+    summary="Update device energy limits",
+)
+def update_device_limits(
+    device_id: str,
+    body: UpdateDeviceLimitsRequest,
+    session: SessionDep,
+    current_user: CurrentActiveUser,
+):
+    if current_user.id is None:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="User ID is missing from the database record.")
+    device = _get_owned_device(device_id, current_user.id, session)
+
+    if body.daily_limit_kwh is not None:
+        device.daily_limit_kwh = body.daily_limit_kwh
+    if body.monthly_limit_kwh is not None:
+        device.monthly_limit_kwh = body.monthly_limit_kwh
+    if body.auto_cutoff_enabled is not None:
+        device.auto_cutoff_enabled = body.auto_cutoff_enabled
+
+    # If the device is being re-enabled, clear any previous cutoff reason and timestamp
+    device.cutoff_reason = None
+    device.cutoff_at = None
+
     session.add(device)
     session.commit()
     session.refresh(device)
@@ -134,10 +158,8 @@ def delete_device(
     Unregister a device by marking it as disabled.
     """
     if current_user.id is None:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="User ID is missing from the database record.",
-        )
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="User ID is missing from the database record.")
+
     device = _get_owned_device(device_id, current_user.id, session)
     # Soft delete — mark inactive rather than removing the row
     # Preserves telemetry history linked to this device_id

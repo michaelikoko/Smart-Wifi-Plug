@@ -167,6 +167,8 @@ def get_current_active_user(current_user: Annotated[User, Depends(get_current_us
     """
     if current_user.is_active is False:
         raise HTTPException(status_code=403, detail="Inactive user")
+    # static type-narrowing: persisted users must have an id
+    assert current_user.id is not None, "Persisted user must have an id"
     return current_user
 
 

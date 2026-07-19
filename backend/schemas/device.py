@@ -1,4 +1,5 @@
 from pydantic import BaseModel, ConfigDict
+from sqlmodel import SQLModel, Field
 from typing import Optional
 from datetime import datetime
 
@@ -18,6 +19,17 @@ class DeviceResponse(BaseModel):
     relay_state: bool
     is_enabled:  bool
     is_online: bool
+    daily_limit_kwh: Optional[float] = None
+    monthly_limit_kwh: Optional[float] = None
+    auto_cutoff_enabled: bool = False
+    cutoff_reason: Optional[str] = None
+    cutoff_at: Optional[datetime] = None
     last_seen:  Optional[datetime]
     created_at: Optional[datetime]
     updated_at: Optional[datetime]
+
+
+class UpdateDeviceLimitsRequest(SQLModel):
+    daily_limit_kwh: Optional[float] = Field(default=None, gt=0)
+    monthly_limit_kwh: Optional[float] = Field(default=None, gt=0)
+    auto_cutoff_enabled: Optional[bool] = None
