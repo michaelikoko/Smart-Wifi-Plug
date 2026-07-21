@@ -15,6 +15,7 @@ logging.basicConfig(
 
 logger = logging.getLogger("energy_limits.enforcement")
 
+
 def _try_create_event(
     session: Session,
     device_id: str,
@@ -39,10 +40,10 @@ def _try_create_event(
         session.add(event)
         session.flush()
         nested_transaction.commit()
-        #logger.info("Event created — device=%s type=%s period=%s", device_id, event_type, period_key)
+        # logger.info("Event created — device=%s type=%s period=%s", device_id, event_type, period_key)
         return event
     except IntegrityError as e:
-        #logger.error("IntegrityError in _try_create_event — device=%s type=%s: %s", device_id, event_type, e)
+        # logger.error("IntegrityError in _try_create_event — device=%s type=%s: %s", device_id, event_type, e)
         nested_transaction.rollback()
         return None
 
@@ -63,6 +64,14 @@ def check_limits_and_get_cutoff_reason(
     if device.user_id is None:
         return None, []
 
+    logger.info(
+        "Enforcement check — device=%s daily=%.3f monthly=%.3f daily_limit=%s monthly_limit=%s",
+        device.device_id,
+        daily_kwh,
+        monthly_kwh,
+        device.daily_limit_kwh,
+        device.monthly_limit_kwh,
+    )
     if device.daily_limit_kwh is not None and daily_kwh > device.daily_limit_kwh:
         cutoff_reason = cutoff_reason or "daily_limit"
         event = _try_create_event(

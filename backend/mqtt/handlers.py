@@ -231,7 +231,9 @@ def _save_telemetry_to_db(
 
         # Update last_seen and relay_state on the device record, and online status
         device.last_seen = datetime.fromtimestamp(resolved_ts_epoch, tz=timezone.utc)
-        device.relay_state = bool(payload.relay)  # ← Update relay state
+        if not device.cutoff_reason:
+            # Only update relay state if device is not cut off.
+            device.relay_state = bool(payload.relay)  # ← Update relay state
         device.is_online = True  # Device is online if we're receiving telemetry
         session.add(device)
 
@@ -268,7 +270,7 @@ def _save_telemetry_to_db(
                 session=session,
             )
 
-            if cutoff_reason and device.cutoff_reason is None:
+            if cutoff_reason and not device.cutoff_reason:
                 # First breach — cut off the device
                 device.cutoff_reason = cutoff_reason
                 device.cutoff_at = datetime.now(timezone.utc)
@@ -279,6 +281,7 @@ def _save_telemetry_to_db(
                     "Auto-cutoff triggered — device=%s reason=%s daily=%.3f monthly=%.3f",
                     device_id, cutoff_reason, daily_kwh, monthly_kwh,
                 )
+
             session.commit()
 
             print("Checking events to publish")
@@ -287,6 +290,8 @@ def _save_telemetry_to_db(
                 session.refresh(event)  # Refresh to get the auto-generated ID and timestamps
                 print("Publishing events")
                 _publish_energy_event(device_id, event)
+        else:
+            session.commit() # commits when auto_cutoff_enabled is False
         # --- End energy limit enforcement ---
 
     except Exception as e:
