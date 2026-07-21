@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { CurrentEnergyResponse } from '../api/telemetry-api'
+import type { CurrentEnergyResponse } from '../api/telemetry-api';
 
 export interface LiveTelemetry {
   voltage: number;
@@ -11,10 +11,8 @@ export interface LiveTelemetry {
   relay: boolean;
   rssi: number;
   ts: number;
-  receivedAt: number; // Date.now() when this was processed client-side
+  receivedAt: number; 
 }
-
-// Use Current Energy Response as the type for live energy readings, since it has the same fields
 
 export interface LiveRelayState {
   state: 'ON' | 'OFF';
@@ -26,17 +24,21 @@ export interface LiveRelayState {
 interface DeviceStateEntry {
   telemetry: LiveTelemetry | null;
   relayState: LiveRelayState | null;
-  isOnline: boolean | null; // null = unknown, true = online, false = offline
-  currentEnergyReadings: CurrentEnergyResponse | null; // Summary of today's energy readings, updated every 5 minutes
+  isOnline: boolean | null; 
+  currentEnergyReadings: CurrentEnergyResponse | null; 
+  unreadEventCount: number;
 }
 
 interface DeviceStateStore {
-  devices: Record<string, DeviceStateEntry>; // keyed by device_id
+  devices: Record<string, DeviceStateEntry>; 
 
   setTelemetry: (deviceId: string, data: LiveTelemetry) => void;
   setOnlineStatus: (deviceId: string, isOnline: boolean) => void;
   setCurrentEnergyReadings: (deviceId: string, data: CurrentEnergyResponse) => void;
   setRelayState: (deviceId: string, data: LiveRelayState) => void;
+  incrementUnreadEvents: (deviceId: string) => void;
+  clearUnreadEvents: (deviceId: string) => void;
+  totalUnreadEvents: () => number;
   clearDevice: (deviceId: string) => void;
   clearAll: () => void;
 }
@@ -46,9 +48,11 @@ const DEFAULT_ENTRY: DeviceStateEntry = {
   relayState: null,
   isOnline: null,
   currentEnergyReadings: null,
+  unreadEventCount: 0,
 };
 
-export const useDeviceStateStore = create<DeviceStateStore>((set) => ({
+// 💡 Pass 'get' as the second argument to the creator function
+export const useDeviceStateStore = create<DeviceStateStore>((set, get) => ({
   devices: {},
 
   setTelemetry: (deviceId, data) =>
@@ -91,6 +95,36 @@ export const useDeviceStateStore = create<DeviceStateStore>((set) => ({
         },
       },
     })),
+
+  incrementUnreadEvents: (deviceId) =>
+    set((state) => ({
+      devices: {
+        ...state.devices,
+        [deviceId]: {
+          ...(state.devices[deviceId] ?? DEFAULT_ENTRY),
+          unreadEventCount: (state.devices[deviceId]?.unreadEventCount ?? 0) + 1,
+        },
+      },
+    })),
+
+  clearUnreadEvents: (deviceId) =>
+    set((state) => ({
+      devices: {
+        ...state.devices,
+        [deviceId]: {
+          ...(state.devices[deviceId] ?? DEFAULT_ENTRY),
+          unreadEventCount: 0,
+        },
+      },
+    })),
+
+  // 💡 Explicit return type added, and using 'get()' instead of the store instance
+  totalUnreadEvents: (): number => {
+    const state = get();
+    return Object.values(state.devices).reduce(
+      (sum, entry) => sum + (entry.unreadEventCount ?? 0), 0
+    );
+  },
 
   clearDevice: (deviceId) =>
     set((state) => {

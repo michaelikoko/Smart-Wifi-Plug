@@ -3,11 +3,12 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import {
     Activity,
     ArrowLeft,
+    AlertTriangle,
     Battery, CircleDot,
     Gauge, Radio, ToggleLeft, ToggleRight, Wifi, Zap,
 } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
-import { Pressable, RefreshControl, ScrollView, View } from 'react-native';
+import { Pressable, RefreshControl, ScrollView, TextInput, View } from 'react-native';
 
 import { Badge, BadgeText } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
@@ -18,8 +19,8 @@ import { Text } from '@/components/ui/text';
 import { VStack } from '@/components/ui/vstack';
 
 import { WeeklyBars, type WeeklyBarDatum } from '@/components/app-ui';
-import { listDevices } from '../../../api/devices-api';
-import { getEnergyHistory, is404 } from '../../../api/telemetry-api';
+import { listDevices, updateDeviceLimits } from '../../../api/devices-api';
+import { getEnergyHistory, getMonthlyEnergy, is404 } from '../../../api/telemetry-api';
 import { publishRelayCommand } from '../../../lib/mqtt-client';
 import { useDeviceStateStore } from '../../../store/device-state-store';
 
@@ -100,6 +101,10 @@ export default function DeviceDetailScreen() {
     const currentEnergyReadings = liveState?.currentEnergyReadings ?? null; // null = unknown, CurrentEnergyResponse = latest summary
 
     const [isToggling, setIsToggling] = useState(false);
+    //const [dailyLimit, setDailyLimit] = useState('');
+    //const [monthlyLimit, setMonthlyLimit] = useState('');
+    //const [autoCutoff, setAutoCutoff] = useState(false);
+    const [saveSuccess, setSaveSuccess] = useState('');
 
     // Pull device metadata from the already-fetched devices query cache.
     // No separate network call — the list is fetched on home.tsx mount.
@@ -109,6 +114,29 @@ export default function DeviceDetailScreen() {
         staleTime: Infinity, // home.tsx manages invalidation
     });
     const device = devices.find((d) => d.device_id === device_id);
+
+
+    // Initialize state directly from the derived device object
+    const [dailyLimit, setDailyLimit] = useState(() => 
+        device?.daily_limit_kwh != null ? String(device.daily_limit_kwh) : ''
+    );
+    const [monthlyLimit, setMonthlyLimit] = useState(() => 
+        device?.monthly_limit_kwh != null ? String(device.monthly_limit_kwh) : ''
+    );
+    const [autoCutoff, setAutoCutoff] = useState(() => 
+        device?.auto_cutoff_enabled ?? false
+    );
+
+
+    /*
+    useEffect(() => {
+        if (!device) return;
+        setDailyLimit(device.daily_limit_kwh != null ? String(device.daily_limit_kwh) : '');
+        setMonthlyLimit(device.monthly_limit_kwh != null ? String(device.monthly_limit_kwh) : '');
+        setAutoCutoff(device.auto_cutoff_enabled);
+        setSaveSuccess('');
+    }, [device?.daily_limit_kwh, device?.monthly_limit_kwh, device?.auto_cutoff_enabled]);
+    */
 
     // Resolve relay state: MQTT confirmation > REST fallback
     const relayIsOn = relayConfirmed != null
@@ -127,6 +155,27 @@ export default function DeviceDetailScreen() {
         staleTime: 5 * 60_000,
         retry: (failureCount, error) => (!is404(error) && failureCount < 2),
     });
+
+    const { data: monthlyEnergy } = useQuery({
+        queryKey: ['energy-monthly', device_id],
+        queryFn: () => getMonthlyEnergy(device_id),
+        enabled: !!device_id,
+        staleTime: 60_000,
+        retry: (failureCount, error) => (!is404(error) && failureCount < 2),
+    });
+
+    const dailyKwh = currentEnergyReadings?.kwh_consumed ?? 0;
+    const monthlyKwh = monthlyEnergy?.kwh_consumed ?? 0;
+
+    const isOverDailyLimit = device?.auto_cutoff_enabled === true
+        && device.daily_limit_kwh != null
+        && dailyKwh > device.daily_limit_kwh;
+
+    const isOverMonthlyLimit = device?.auto_cutoff_enabled === true
+        && device.monthly_limit_kwh != null
+        && monthlyKwh > device.monthly_limit_kwh;
+
+    const isOverLimit = isOverDailyLimit || isOverMonthlyLimit;
 
     const weeklyData: WeeklyBarDatum[] = (() => {
         const todayDate = new Date().toISOString().slice(0, 10);
@@ -158,15 +207,15 @@ export default function DeviceDetailScreen() {
     })();
 
     // Pull-to-refresh — only REST data, MQTT is always live
-    const isRefetching =  isRefetchingHistory;
+    const isRefetching = isRefetchingHistory;
 
     const onRefresh = async () => {
         await queryClient.invalidateQueries({
             predicate: (q) =>
-                ['energy-today', 'energy-history'].includes(q.queryKey[0] as string) &&
+                ['energy-today', 'energy-history', 'energy-monthly'].includes(q.queryKey[0] as string) &&
                 q.queryKey[1] === device_id,
         });
-        await Promise.all([ refetchHistory()]);
+        await Promise.all([refetchHistory()]);
     };
 
     // Relay toggle
@@ -180,7 +229,39 @@ export default function DeviceDetailScreen() {
         },
     });
 
+    const limitsMutation = useMutation({
+        mutationFn: () => {
+            const parsedDaily = dailyLimit.trim() === '' ? undefined : Number(dailyLimit);
+            const parsedMonthly = monthlyLimit.trim() === '' ? undefined : Number(monthlyLimit);
+
+            return updateDeviceLimits(device_id, {
+                ...(Number.isFinite(parsedDaily as number) ? { daily_limit_kwh: parsedDaily as number } : {}),
+                ...(Number.isFinite(parsedMonthly as number) ? { monthly_limit_kwh: parsedMonthly as number } : {}),
+                auto_cutoff_enabled: autoCutoff,
+            });
+        },
+        onSuccess: async () => {
+            await queryClient.invalidateQueries({ queryKey: ['devices'] });
+            await queryClient.invalidateQueries({ queryKey: ['energy-monthly', device_id] });
+            setSaveSuccess('Limits saved.');
+        },
+    });
+
+    useEffect(() => {
+        if (!saveSuccess) return;
+        const timer = setTimeout(() => setSaveSuccess(''), 1800);
+        return () => clearTimeout(timer);
+    }, [saveSuccess]);
+
     // Clear toggling once MQTT relay/state confirmation arrives
+    /*
+    useEffect(() => {
+        if (relayConfirmed == null || !isToggling) return;
+
+        const timer = setTimeout(() => setIsToggling(false), 0);
+        return () => clearTimeout(timer);
+    }, [relayConfirmed, isToggling]);
+    */
     useEffect(() => {
         if (relayConfirmed != null && isToggling) {
             setIsToggling(false);
@@ -237,6 +318,24 @@ export default function DeviceDetailScreen() {
                     />
                 }
             >
+                {isOverLimit && (
+                    <Card size="sm" className="w-full rounded-2xl border-destructive bg-destructive/10">
+                        <HStack className="items-center gap-3">
+                            <AlertTriangle size={18} color="#E7000B" />
+                            <VStack className="flex-1 gap-0.5">
+                                <Text className="text-[13px] font-bold text-destructive">
+                                    Energy limit exceeded
+                                </Text>
+                                <Text className="text-[11px] text-destructive/80">
+                                    {isOverDailyLimit
+                                        ? `Daily usage ${dailyKwh.toFixed(3)} kWh exceeds your ${device!.daily_limit_kwh} kWh limit.`
+                                        : `Monthly usage ${monthlyKwh.toFixed(3)} kWh exceeds your ${device!.monthly_limit_kwh} kWh limit.`}
+                                    {' '}Raise your limit to re-arm.
+                                </Text>
+                            </VStack>
+                        </HStack>
+                    </Card>
+                )}
 
                 <Card size="sm" className="w-full rounded-2xl">
                     <HStack className="items-center justify-between">
@@ -245,16 +344,26 @@ export default function DeviceDetailScreen() {
                                 Relay Control
                             </Text>
                             <Text className="text-[15px] font-bold text-foreground">
-                                {isToggling ? 'Switching...' : relayIsOn ? 'Turned On' : 'Turned Off'}
+                                {isToggling
+                                    ? 'Switching...'
+                                    : isOverLimit
+                                        ? 'Limit exceeded'
+                                        : relayIsOn
+                                            ? 'Turned On'
+                                            : 'Turned Off'}
                             </Text>
                         </VStack>
 
                         <Pressable
                             onPress={handleRelayToggle}
-                            disabled={isToggling || !isOnline}
-                            className={['rounded-2xl px-5 py-3.5 flex-row items-center gap-2 disabled:bg-muted disabled:opacity-60',
-                                isToggling ? 'opacity-60 bg-muted' :
+                            //disabled={isToggling || !isOnline}
+                            disabled={isToggling || !isOnline || isOverLimit}
+                            className={[
+                                'rounded-2xl px-5 py-3.5 flex-row items-center gap-2 disabled:bg-muted disabled:opacity-60',
+                                isToggling || isOverLimit ? 'opacity-60 bg-muted' :
                                     relayIsOn ? 'bg-success' : 'bg-destructive',
+                                /*isToggling ? 'opacity-60 bg-muted' :
+                                    relayIsOn ? 'bg-success' : 'bg-destructive',*/
                             ].join(' ')}
                         >
                             {isToggling ? (
@@ -265,10 +374,102 @@ export default function DeviceDetailScreen() {
                                 <ToggleLeft size={20} color="#fff" />
                             )}
                             <Text className="text-[13px] font-bold uppercase tracking-widest text-white">
-                                {relayIsOn ? 'On' : 'Off'}
+                                {
+                                    isToggling
+                                        ? 'Switching...'
+                                        : isOverLimit
+                                            ? 'Limit exceeded'
+                                            : relayIsOn
+                                                ? 'Turned On'
+                                                : 'Turned Off'
+                                    /*{relayIsOn ? 'On' : 'Off'}*/
+                                }
                             </Text>
                         </Pressable>
                     </HStack>
+                </Card>
+
+                <Card size="sm" className="w-full rounded-2xl">
+                    <VStack className="gap-3">
+                        <Text className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                            Energy Limits
+                        </Text>
+
+                        <VStack className="gap-2">
+                            <Text className="text-[13px] font-semibold text-foreground">
+                                Daily limit (kWh)
+                            </Text>
+                            <TextInput
+                                value={dailyLimit}
+                                onChangeText={setDailyLimit}
+                                placeholder="0.40"
+                                placeholderTextColor="#a3a3a3"
+                                keyboardType="numeric"
+                                className="rounded-xl border border-border bg-secondary px-4 py-3 text-[15px] text-foreground"
+                            />
+                        </VStack>
+
+                        <VStack className="gap-2">
+                            <Text className="text-[13px] font-semibold text-foreground">
+                                Monthly limit (kWh)
+                            </Text>
+                            <TextInput
+                                value={monthlyLimit}
+                                onChangeText={setMonthlyLimit}
+                                placeholder="12.00"
+                                placeholderTextColor="#a3a3a3"
+                                keyboardType="numeric"
+                                className="rounded-xl border border-border bg-secondary px-4 py-3 text-[15px] text-foreground"
+                            />
+                        </VStack>
+
+                        <HStack className="items-center justify-between rounded-xl border border-border bg-secondary px-4 py-3">
+                            <VStack className="flex-1 gap-0.5 pr-4">
+                                <Text className="text-[13px] font-semibold text-foreground">
+                                    Auto cutoff
+                                </Text>
+                                <Text className="text-[11px] text-muted-foreground">
+                                    Disable the relay when a limit is reached.
+                                </Text>
+                            </VStack>
+
+                            <Pressable
+                                onPress={() => setAutoCutoff((value) => !value)}
+                                className={[
+                                    'rounded-2xl px-5 py-3.5 flex-row items-center gap-2',
+                                    autoCutoff ? 'bg-success' : 'bg-destructive',
+                                ].join(' ')}
+                            >
+                                {autoCutoff ? (
+                                    <ToggleRight size={20} color="#fff" />
+                                ) : (
+                                    <ToggleLeft size={20} color="#fff" />
+                                )}
+                                <Text className="text-[13px] font-bold uppercase tracking-widest text-white">
+                                    {autoCutoff ? 'On' : 'Off'}
+                                </Text>
+                            </Pressable>
+                        </HStack>
+
+                        <Pressable
+                            onPress={() => limitsMutation.mutate()}
+                            disabled={limitsMutation.isPending}
+                            className={[
+                                'items-center justify-center rounded-2xl px-5 py-3.5 active:opacity-70 disabled:opacity-60',
+                                limitsMutation.isPending ? 'bg-muted' : 'bg-primary',
+                            ].join(' ')}
+                        >
+                            <Text className="text-[13px] font-bold uppercase tracking-widest text-primary-foreground">
+                                {limitsMutation.isPending ? 'Saving...' : 'Save limits'}
+                            </Text>
+                        </Pressable>
+
+                        {saveSuccess ? (
+                            <Text className="text-[11px] font-semibold text-emerald-600">
+                                {saveSuccess}
+                            </Text>
+                        ) : null}
+                    </VStack>
                 </Card>
 
                 <Card size="sm" className="w-full rounded-2xl">
@@ -363,7 +564,7 @@ export default function DeviceDetailScreen() {
                     <VStack className="gap-3">
                         <HStack className="items-center justify-between">
                             <Text className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                                Today's Usage
+                                Today&apos;s Usage
                             </Text>
                             <HStack className="items-center gap-1">
                                 <CircleDot size={10} color="#10b981" />

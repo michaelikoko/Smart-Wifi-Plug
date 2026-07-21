@@ -16,6 +16,12 @@ export interface CurrentEnergyResponse {
     estimated_cost: number | null; // In kobo, null if billing_rate is not set for the device
 }
 
+export interface MonthlyEnergyResponse {
+    device_id: string;
+    month: string;
+    kwh_consumed: number;
+}
+
 export interface EnergyConsumedResponse {
     device_id: string;
     date: string;
@@ -54,6 +60,18 @@ export const getTodayEnergy = async (deviceId: string): Promise<CurrentEnergyRes
     */
     const response = await apiClient.get<CurrentEnergyResponse>(
         `/telemetry/${deviceId}/energy/today`
+    );
+    return response.data;
+};
+
+export const getMonthlyEnergy = async (deviceId: string): Promise<MonthlyEnergyResponse> => {
+    /*
+    GET /telemetry/{device_id}/energy/monthly
+    Returns the sum of kwh_consumed for the current calendar month.
+    404 if no data exists for this device this month.
+    */
+    const response = await apiClient.get<MonthlyEnergyResponse>(
+        `/telemetry/${deviceId}/energy/monthly`
     );
     return response.data;
 };

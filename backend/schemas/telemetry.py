@@ -67,3 +67,9 @@ class EnergyConsumedResponse(BaseModel):
     kwh_consumed: Optional[float]
     peak_power:   Optional[float]
     estimated_cost: Optional[int] = None # Estimated cost in kobo.
+
+class MonthlyEnergyConsumedResponse(BaseModel):
+    """Energy consumed for the month."""
+    device_id: str
+    month: str
+    kwh_consumed: float

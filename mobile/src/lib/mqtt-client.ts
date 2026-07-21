@@ -1,9 +1,8 @@
 import mqtt, { MqttClient } from 'mqtt';
+import { queryClient } from './query-client';
 import { useDeviceStateStore } from '../store/device-state-store';
 import type { LiveTelemetry, LiveRelayState } from '../store/device-state-store';
 import { CurrentEnergyResponse } from '../api/telemetry-api';
-
-const MQTT_WS_URL = 'ws://broker.hivemq.com:8000/';
 
 let client: MqttClient | null = null;
 let connectPromise: Promise<MqttClient> | null = null;
@@ -137,6 +136,14 @@ function _handleMessage(topic: string, payloadBuffer: Buffer) {
     useDeviceStateStore.getState().setCurrentEnergyReadings(deviceId, data as any as CurrentEnergyResponse);
     return;
   }
+
+  if (subtopic === 'energy-event') {
+    console.log(`[mqtt] energy-event ${deviceId}:`, data);
+    useDeviceStateStore.getState().incrementUnreadEvents(deviceId);
+    queryClient.invalidateQueries({ queryKey: ['events'] });
+    queryClient.invalidateQueries({ queryKey: ['devices'] }); // ← add this
+    return;
+  }
 }
 
 
@@ -145,7 +152,8 @@ function _subscribeTopicsForDevices(deviceIds: string[], c: MqttClient) {
     `smartplug/${id}/telemetry`,
     `smartplug/${id}/relay/state`,
     `smartplug/${id}/be-online-status`, // Endpoint that only the server publishes to indicate online/offline status 
-    `smartplug/${id}/be-daily-summary` // Endpoint that only the server publishes to indicate daily energy summary
+    `smartplug/${id}/be-daily-summary`, // Endpoint that only the server publishes to indicate daily energy summary
+    `smartplug/${id}/energy-event`,
   ]);
 
   c.subscribe(topics, { qos: 1 }, (err) => {

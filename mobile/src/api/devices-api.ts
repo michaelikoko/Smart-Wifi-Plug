@@ -8,6 +8,11 @@ export interface DeviceResponse {
   is_enabled: boolean;
   is_online: boolean;
   relay_state: boolean;
+  daily_limit_kwh: number | null;
+  monthly_limit_kwh: number | null;
+  auto_cutoff_enabled: boolean;
+  cutoff_reason: string | null;
+  cutoff_at: string | null;
   last_seen: string | null;
   created_at: string;
 }
@@ -15,6 +20,12 @@ export interface DeviceResponse {
 export interface DeviceRegisterRequest {
   device_id: string;
   name: string;
+}
+
+export interface UpdateDeviceLimitsRequest {
+  daily_limit_kwh?: number;
+  monthly_limit_kwh?: number;
+  auto_cutoff_enabled?: boolean;
 }
 
 export const listDevices = async (): Promise<DeviceResponse[]> => {
@@ -45,6 +56,15 @@ export const updateDevice = async (
 ): Promise<DeviceResponse> => {
   /* PATCH /devices/{device_id} — update name only */
   const response = await apiClient.patch<DeviceResponse>(`/devices/${deviceId}`, data);
+  return response.data;
+};
+
+export const updateDeviceLimits = async (
+  deviceId: string,
+  data: UpdateDeviceLimitsRequest
+): Promise<DeviceResponse> => {
+  /* PATCH /devices/{device_id}/limits */
+  const response = await apiClient.patch<DeviceResponse>(`/devices/${deviceId}/limits`, data);
   return response.data;
 };
 

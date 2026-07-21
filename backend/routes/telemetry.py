@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Query, HTTPException
-from schemas.telemetry import TelemetryListResponse, TelemetryResponse, CurrentEnergyResponse, EnergyConsumedResponse
-from datetime import datetime, timezone
+from schemas.telemetry import TelemetryListResponse, TelemetryResponse, CurrentEnergyResponse, EnergyConsumedResponse, MonthlyEnergyConsumedResponse
+from datetime import datetime, timezone, date as date_type
 from db.session import SessionDep
 from sqlmodel import select, desc
 from models.telemetry import TelemetryReading, DeviceDailySummary
@@ -177,3 +177,44 @@ def get_energy_history(
         for s in summaries
     ]
 
+@router.get(
+    "/{device_id}/energy/monthly",
+    summary="Current month's total energy consumption",
+    response_model= MonthlyEnergyConsumedResponse,
+)
+def get_monthly_energy(
+    device_id: str,
+    session: SessionDep,
+    current_user: CurrentActiveUser,
+):
+    """
+    Returns the sum of kwh_consumed across all DeviceDailySummary rows
+    for the current calendar month (UTC).
+    """
+    # Verify ownership - Change this to a middleware
+    device = session.exec(
+        select(Device)
+        .where(Device.device_id == device_id)
+        .where(Device.user_id == current_user.id)
+        .where(Device.is_enabled == True)  # noqa: E712
+    ).first()
+
+    if not device:
+        raise HTTPException(403, "Device not found or access denied")
+
+    now = datetime.now(timezone.utc)
+    month_start = date_type(now.year, now.month, 1)
+
+    summaries = session.exec(
+        select(DeviceDailySummary)
+        .where(DeviceDailySummary.device_id == device_id)
+        .where(DeviceDailySummary.date >= month_start)
+    ).all()
+
+    monthly_kwh = round(sum(s.kwh_consumed or 0.0 for s in summaries), 4)
+
+    return {
+        "device_id": device_id,
+        "month": now.strftime("%Y-%m"),
+        "kwh_consumed": monthly_kwh,
+    }

@@ -3,6 +3,7 @@ import { Tabs } from 'expo-router';
 import { useColorScheme, type ColorValue } from 'react-native';
 import { Home, PlugZap, BarChart3, Bell, User, type LucideIcon } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useDeviceStateStore } from '../../store/device-state-store';
 
 const COLORS = {
   light: {
@@ -48,6 +49,7 @@ export default function AppTabsLayout() {
   const colorScheme = useColorScheme();
   const mode = colorScheme === 'dark' ? 'dark' : 'light';
   const c = COLORS[mode];
+  const totalUnread = useDeviceStateStore((s) => s.totalUnreadEvents());
 
   const insets = useSafeAreaInsets();
   return (
@@ -96,7 +98,9 @@ export default function AppTabsLayout() {
         name="alerts"
         options={{
           title: 'Alerts',
-          tabBarIcon: ({ color }) => <TabIcon icon={Bell} color={color} showDot />,
+          tabBarIcon: ({ color }) => (
+            <TabIcon icon={Bell} color={color} showDot={totalUnread > 0} />
+          ),
         }}
       />
       <Tabs.Screen

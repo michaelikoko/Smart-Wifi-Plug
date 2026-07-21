@@ -2,10 +2,11 @@ import { GluestackUIProvider } from '@/components/ui/gluestack-ui-provider';
 import { Stack, useRouter } from 'expo-router';
 import { useColorScheme } from 'react-native';
 import '@/src/global.css';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryClientProvider } from '@tanstack/react-query';
 import { useSegments } from 'expo-router';
 import { useAuthStore } from '../store/auth-store';
 import { useEffect } from 'react';
+import { queryClient } from '../lib/query-client';
 
 
 function AuthGuard() {
@@ -40,14 +41,6 @@ export default function RootLayout() {
   }
 
 
-  // Add network status listener to refetch queries on reconnect later
-  const queryClient = new QueryClient({
-    defaultOptions: {
-      queries: { retry: 1, staleTime: 1000 * 60 * 5 },
-      mutations: { retry: 0 },
-    },
-  });
-  ;
   return (
     <QueryClientProvider client={queryClient}>
       <GluestackUIProvider mode={mode}>
