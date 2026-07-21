@@ -1,5 +1,5 @@
-import apiClient from './client';
-import axios from 'axios';
+import { apiClient } from './client';
+import {isAxiosError} from 'axios';
 
 export interface CurrentEnergyResponse {
     device_id: string;
@@ -118,5 +118,5 @@ export function is404(error: unknown): boolean {
     Helper used by useQuery's retry option to suppress retries on 404.
     404 = "no data yet", which is a normal state, not an error worth retrying.    
     */
-    return axios.isAxiosError(error) && error.response?.status === 404;
+    return isAxiosError(error) && error.response?.status === 404;
 }

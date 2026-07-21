@@ -19,12 +19,13 @@
 import axios, {
   AxiosError,
   InternalAxiosRequestConfig,
+  create as axiosCreate,
 } from 'axios';
 import { useAuthStore } from '../store/auth-store';
 
 const BASE_URL = 'http://192.168.178.30:8000/api/v1';
 
-export const apiClient = axios.create({
+export const apiClient = axiosCreate({
   baseURL: BASE_URL,
   headers: {
     'Content-Type': 'application/json',
@@ -148,5 +149,3 @@ apiClient.interceptors.response.use(
     }
   }
 );
-
-export default apiClient;

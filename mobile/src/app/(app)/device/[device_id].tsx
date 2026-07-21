@@ -20,7 +20,7 @@ import { VStack } from '@/components/ui/vstack';
 
 import { WeeklyBars, type WeeklyBarDatum } from '@/components/app-ui';
 import { listDevices, updateDeviceLimits } from '../../../api/devices-api';
-import { getEnergyHistory, getMonthlyEnergy, is404 } from '../../../api/telemetry-api';
+import { getEnergyHistory, is404 } from '../../../api/telemetry-api';
 import { publishRelayCommand } from '../../../lib/mqtt-client';
 import { useDeviceStateStore } from '../../../store/device-state-store';
 
@@ -115,21 +115,6 @@ export default function DeviceDetailScreen() {
         staleTime: Infinity, // home.tsx manages invalidation
     });
     const device = devices.find((d) => d.device_id === device_id);
-
-
-    /*
-    // Initialize state directly from the derived device object
-    const [dailyLimit, setDailyLimit] = useState(() => 
-        device?.daily_limit_kwh != null ? String(device.daily_limit_kwh) : ''
-    );
-    const [monthlyLimit, setMonthlyLimit] = useState(() => 
-        device?.monthly_limit_kwh != null ? String(device.monthly_limit_kwh) : ''
-    );
-    const [autoCutoff, setAutoCutoff] = useState(() => 
-        device?.auto_cutoff_enabled ?? false
-    );
-    */
-
     
     useEffect(() => {
         if (!device) return;
@@ -157,16 +142,6 @@ export default function DeviceDetailScreen() {
         staleTime: 5 * 60_000,
         retry: (failureCount, error) => (!is404(error) && failureCount < 2),
     });
-
-    /*
-    const { data: monthlyEnergy } = useQuery({
-        queryKey: ['energy-monthly', device_id],
-        queryFn: () => getMonthlyEnergy(device_id),
-        enabled: !!device_id,
-        staleTime: 60_000,
-        retry: (failureCount, error) => (!is404(error) && failureCount < 2),
-    });
-    */
 
     const dailyKwh = currentEnergyReadings?.kwh_consumed ?? 0;
     const monthlyKwh = monthlyEnergyReadings?.kwh_consumed ?? 0;
@@ -246,7 +221,6 @@ export default function DeviceDetailScreen() {
         },
         onSuccess: async () => {
             await queryClient.invalidateQueries({ queryKey: ['devices'] });
-            //await queryClient.invalidateQueries({ queryKey: ['energy-monthly', device_id] });
             setSaveSuccess('Limits saved.');
         },
     });
@@ -257,15 +231,6 @@ export default function DeviceDetailScreen() {
         return () => clearTimeout(timer);
     }, [saveSuccess]);
 
-    // Clear toggling once MQTT relay/state confirmation arrives
-    /*
-    useEffect(() => {
-        if (relayConfirmed == null || !isToggling) return;
-
-        const timer = setTimeout(() => setIsToggling(false), 0);
-        return () => clearTimeout(timer);
-    }, [relayConfirmed, isToggling]);
-    */
     useEffect(() => {
         if (relayConfirmed != null && isToggling) {
             setIsToggling(false);
@@ -386,7 +351,6 @@ export default function DeviceDetailScreen() {
                                             : relayIsOn
                                                 ? 'Turned On'
                                                 : 'Turned Off'
-                                    /*{relayIsOn ? 'On' : 'Off'}*/
                                 }
                             </Text>
                         </Pressable>
