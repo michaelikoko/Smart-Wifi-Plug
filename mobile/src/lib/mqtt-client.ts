@@ -2,7 +2,7 @@ import mqtt, { MqttClient } from 'mqtt';
 import { queryClient } from './query-client';
 import { useDeviceStateStore } from '../store/device-state-store';
 import type { LiveTelemetry, LiveRelayState } from '../store/device-state-store';
-import { CurrentEnergyResponse } from '../api/telemetry-api';
+import type { CurrentEnergyResponse, MonthlyEnergyResponse } from '../api/telemetry-api';
 
 let client: MqttClient | null = null;
 let connectPromise: Promise<MqttClient> | null = null;
@@ -137,6 +137,13 @@ function _handleMessage(topic: string, payloadBuffer: Buffer) {
     return;
   }
 
+  if (subtopic === "be-monthly-summary") {
+    // Backend payload: MonthlyEnergyResponse
+    console.log(`[mqtt] be-monthly-summary ${deviceId} data:`, data);
+    useDeviceStateStore.getState().setMonthlyEnergyReadings(deviceId, data as any as MonthlyEnergyResponse);
+    return;
+  }
+
   if (subtopic === 'energy-event') {
     console.log(`[mqtt] energy-event ${deviceId}:`, data);
     useDeviceStateStore.getState().incrementUnreadEvents(deviceId);
@@ -153,6 +160,7 @@ function _subscribeTopicsForDevices(deviceIds: string[], c: MqttClient) {
     `smartplug/${id}/relay/state`,
     `smartplug/${id}/be-online-status`, // Endpoint that only the server publishes to indicate online/offline status 
     `smartplug/${id}/be-daily-summary`, // Endpoint that only the server publishes to indicate daily energy summary
+    `smartplug/${id}/be-monthly-summary`, // Endpoint that only the server publishes to indicate monthly energy summary
     `smartplug/${id}/energy-event`,
   ]);
 

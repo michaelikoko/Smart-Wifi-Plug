@@ -3,7 +3,7 @@ from gmqtt import Client as MQTTClient
 from typing import Any
 import logging
 from datetime import datetime, timezone, date as date_type
-from schemas.telemetry import TelemetryPayload, CurrentEnergyResponse
+from schemas.telemetry import TelemetryPayload, CurrentEnergyResponse, MonthlyEnergyConsumedResponse
 from db.session import SessionDep, get_session, engine
 from models.telemetry import TelemetryReading, DeviceDailySummary
 from sqlmodel import select, Session, col
@@ -99,6 +99,37 @@ def _publish_daily_summary(device_id: str, summary: DeviceDailySummary, billing_
     
     # model_dump_json() magically handles datetime serialization!
     payload = response.model_dump_json() 
+    
+    fast_mqtt.publish(topic, payload, qos=1, retain=True)
+
+def _publish_monthly_summary(device_id: str, session: Session, billing_rate: int | None):
+    """Helper to broadcast the current month's total energy consumption to mobile clients."""
+    logger.info("Publishing monthly summary — device=%s", device_id)
+    
+    now = datetime.now(timezone.utc)
+    month_start = date_type(now.year, now.month, 1)
+
+    summaries = session.exec(
+        select(DeviceDailySummary)
+        .where(DeviceDailySummary.device_id == device_id)
+        .where(DeviceDailySummary.date >= month_start)
+    ).all()
+
+    monthly_kwh = round(sum(s.kwh_consumed or 0.0 for s in summaries), 4)
+    
+    estimated_cost = None
+    if billing_rate is not None:
+        estimated_cost = int(monthly_kwh * billing_rate)
+
+    response = MonthlyEnergyConsumedResponse(
+        device_id=device_id,
+        month=now.strftime("%Y-%m"),
+        kwh_consumed=monthly_kwh,
+        estimated_cost=estimated_cost
+    )
+
+    topic = f"smartplug/{device_id}/be-monthly-summary"
+    payload = response.model_dump_json()
     
     fast_mqtt.publish(topic, payload, qos=1, retain=True)
 
@@ -242,6 +273,10 @@ def _save_telemetry_to_db(
 
         # Publish daily summary to mobile clients
         _publish_daily_summary(device_id, current_summary, device.user.billing_rate)
+
+        # Publish monthly summary to mobile clients
+        _publish_monthly_summary(device_id, session, device.user.billing_rate)
+
         logger.info(
             "Updated device — device=%s last_seen=%s relay=%s",
             device_id,

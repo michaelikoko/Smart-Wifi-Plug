@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { CurrentEnergyResponse } from '../api/telemetry-api';
+import type { CurrentEnergyResponse, MonthlyEnergyResponse } from '../api/telemetry-api';
 
 export interface LiveTelemetry {
   voltage: number;
@@ -26,6 +26,7 @@ interface DeviceStateEntry {
   relayState: LiveRelayState | null;
   isOnline: boolean | null; 
   currentEnergyReadings: CurrentEnergyResponse | null; 
+  monthlyEnergyReadings: MonthlyEnergyResponse | null;  
   unreadEventCount: number;
 }
 
@@ -35,6 +36,7 @@ interface DeviceStateStore {
   setTelemetry: (deviceId: string, data: LiveTelemetry) => void;
   setOnlineStatus: (deviceId: string, isOnline: boolean) => void;
   setCurrentEnergyReadings: (deviceId: string, data: CurrentEnergyResponse) => void;
+  setMonthlyEnergyReadings: (deviceId: string, data: MonthlyEnergyResponse) => void;
   setRelayState: (deviceId: string, data: LiveRelayState) => void;
   incrementUnreadEvents: (deviceId: string) => void;
   clearUnreadEvents: (deviceId: string) => void;
@@ -48,6 +50,7 @@ const DEFAULT_ENTRY: DeviceStateEntry = {
   relayState: null,
   isOnline: null,
   currentEnergyReadings: null,
+  monthlyEnergyReadings: null, // Added property for monthly energy readings
   unreadEventCount: 0,
 };
 
@@ -81,6 +84,17 @@ export const useDeviceStateStore = create<DeviceStateStore>((set, get) => ({
         [deviceId]: {
           ...(state.devices[deviceId] ?? DEFAULT_ENTRY),
           currentEnergyReadings: data,
+        },
+      },
+    })),
+
+  setMonthlyEnergyReadings: (deviceId, data) =>
+    set((state) => ({
+      devices: {
+        ...state.devices,
+        [deviceId]: {
+          ...(state.devices[deviceId] ?? DEFAULT_ENTRY),
+          monthlyEnergyReadings: data,
         },
       },
     })),

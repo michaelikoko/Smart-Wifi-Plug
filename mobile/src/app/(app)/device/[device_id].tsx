@@ -96,14 +96,15 @@ export default function DeviceDetailScreen() {
     const telemetry = liveState?.telemetry ?? null;
     const relayConfirmed = liveState?.relayState ?? null;
 
-    // Live isOnline staus and currentEnergyReadings
+    // Live isOnline staus, currentEnergyReadings, and monthlyEnergyReadings
     const isOnline = liveState?.isOnline ?? null; // null = unknown, true = online, false = offline
     const currentEnergyReadings = liveState?.currentEnergyReadings ?? null; // null = unknown, CurrentEnergyResponse = latest summary
+    const monthlyEnergyReadings = liveState?.monthlyEnergyReadings ?? null; // null = unknown, MonthlyEnergyResponse = latest summary
 
     const [isToggling, setIsToggling] = useState(false);
-    //const [dailyLimit, setDailyLimit] = useState('');
-    //const [monthlyLimit, setMonthlyLimit] = useState('');
-    //const [autoCutoff, setAutoCutoff] = useState(false);
+    const [dailyLimit, setDailyLimit] = useState('');
+    const [monthlyLimit, setMonthlyLimit] = useState('');
+    const [autoCutoff, setAutoCutoff] = useState(false);
     const [saveSuccess, setSaveSuccess] = useState('');
 
     // Pull device metadata from the already-fetched devices query cache.
@@ -116,6 +117,7 @@ export default function DeviceDetailScreen() {
     const device = devices.find((d) => d.device_id === device_id);
 
 
+    /*
     // Initialize state directly from the derived device object
     const [dailyLimit, setDailyLimit] = useState(() => 
         device?.daily_limit_kwh != null ? String(device.daily_limit_kwh) : ''
@@ -126,9 +128,9 @@ export default function DeviceDetailScreen() {
     const [autoCutoff, setAutoCutoff] = useState(() => 
         device?.auto_cutoff_enabled ?? false
     );
+    */
 
-
-    /*
+    
     useEffect(() => {
         if (!device) return;
         setDailyLimit(device.daily_limit_kwh != null ? String(device.daily_limit_kwh) : '');
@@ -136,7 +138,7 @@ export default function DeviceDetailScreen() {
         setAutoCutoff(device.auto_cutoff_enabled);
         setSaveSuccess('');
     }, [device?.daily_limit_kwh, device?.monthly_limit_kwh, device?.auto_cutoff_enabled]);
-    */
+    
 
     // Resolve relay state: MQTT confirmation > REST fallback
     const relayIsOn = relayConfirmed != null
@@ -156,6 +158,7 @@ export default function DeviceDetailScreen() {
         retry: (failureCount, error) => (!is404(error) && failureCount < 2),
     });
 
+    /*
     const { data: monthlyEnergy } = useQuery({
         queryKey: ['energy-monthly', device_id],
         queryFn: () => getMonthlyEnergy(device_id),
@@ -163,9 +166,10 @@ export default function DeviceDetailScreen() {
         staleTime: 60_000,
         retry: (failureCount, error) => (!is404(error) && failureCount < 2),
     });
+    */
 
     const dailyKwh = currentEnergyReadings?.kwh_consumed ?? 0;
-    const monthlyKwh = monthlyEnergy?.kwh_consumed ?? 0;
+    const monthlyKwh = monthlyEnergyReadings?.kwh_consumed ?? 0;
 
     const isOverDailyLimit = device?.auto_cutoff_enabled === true
         && device.daily_limit_kwh != null
@@ -242,7 +246,7 @@ export default function DeviceDetailScreen() {
         },
         onSuccess: async () => {
             await queryClient.invalidateQueries({ queryKey: ['devices'] });
-            await queryClient.invalidateQueries({ queryKey: ['energy-monthly', device_id] });
+            //await queryClient.invalidateQueries({ queryKey: ['energy-monthly', device_id] });
             setSaveSuccess('Limits saved.');
         },
     });
@@ -608,6 +612,58 @@ export default function DeviceDetailScreen() {
                         )}
                     </VStack>
                 </Card>
+
+                <Card size="sm" className="w-full rounded-2xl">
+                    <VStack className="gap-3">
+                        <HStack className="items-center justify-between">
+                            <Text className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                                This Month&apos;s Usage
+                            </Text>
+                            <HStack className="items-center gap-1">
+                                <CircleDot size={10} color={monthlyEnergyReadings ? "#10b981" : "#a3a3a3"} />
+                                <Text className={`text-[10px] ${monthlyEnergyReadings ? 'text-emerald-600' : 'text-muted-foreground'}`}>
+                                    {monthlyEnergyReadings ? 'Live' : 'Synced'}
+                                </Text>
+                            </HStack>
+                        </HStack>
+
+                        <HStack className="gap-2">
+                            <VStack className="flex-1 gap-1.5 rounded-xl border border-border bg-secondary p-3.5">
+                                <Text className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                                    Total Energy
+                                </Text>
+                                <HStack className="items-end gap-1">
+                                    <Text className="text-2xl font-black text-foreground">
+                                        {monthlyEnergyReadings ? monthlyEnergyReadings.kwh_consumed.toFixed(3) : '—'}
+                                    </Text>
+                                    <Text className="mb-0.5 text-[12px] font-semibold text-muted-foreground">kWh</Text>
+                                </HStack>
+                            </VStack>
+
+                            <VStack className="flex-1 gap-1.5 rounded-xl border border-border bg-secondary p-3.5 justify-center">
+                                <Text className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                                    Billing Period
+                                </Text>
+                                <Text className="text-base font-bold text-foreground mt-1">
+                                    {monthlyEnergyReadings?.month 
+                                        ? new Date(monthlyEnergyReadings.month + '-02').toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+                                        : new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+                                    }
+                                </Text>
+                            </VStack>
+                        </HStack>
+
+                        {monthlyEnergyReadings?.estimated_cost != null && (
+                            <HStack className="items-center justify-between rounded-xl border border-border bg-secondary px-4 py-3">
+                                <Text className="text-[13px] text-muted-foreground">Estimated Monthly Cost</Text>
+                                <Text className="text-[15px] font-bold text-foreground">
+                                    ₦{(monthlyEnergyReadings.estimated_cost / 100).toFixed(2)}
+                                </Text>
+                            </HStack>
+                        )}
+                    </VStack>
+                </Card>
+
 
                 <Card size="sm" className="w-full rounded-2xl">
                     <WeeklyBars data={weeklyData} />

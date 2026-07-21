@@ -213,8 +213,13 @@ def get_monthly_energy(
 
     monthly_kwh = round(sum(s.kwh_consumed or 0.0 for s in summaries), 4)
 
+    estimated_cost = None
+    if current_user.billing_rate is not None:
+        estimated_cost = int(monthly_kwh * current_user.billing_rate)
+
     return {
         "device_id": device_id,
         "month": now.strftime("%Y-%m"),
         "kwh_consumed": monthly_kwh,
+        "estimated_cost": estimated_cost
     }

@@ -20,6 +20,7 @@ export interface MonthlyEnergyResponse {
     device_id: string;
     month: string;
     kwh_consumed: number;
+    estimated_cost: number | null; // In kobo, null if billing_rate is not set for the device
 }
 
 export interface EnergyConsumedResponse {

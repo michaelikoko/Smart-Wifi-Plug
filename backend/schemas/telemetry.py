@@ -73,3 +73,4 @@ class MonthlyEnergyConsumedResponse(BaseModel):
     device_id: str
     month: str
     kwh_consumed: float
+    estimated_cost: Optional[int] = None # Estimated cost in kobo. This is not stored in the database, but calculated on the fly using the user's billing_rate and the kwh consumed in the current month.
