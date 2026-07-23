@@ -23,9 +23,9 @@ import axios, {
 } from 'axios';
 import { useAuthStore } from '../store/auth-store';
 
-const BASE_URL = 'http://192.168.178.30:8000/api/v1';
+const BASE_URL = 'http://192.168.163.30:8000/api/v1';
 
-export const apiClient = axiosCreate({
+const apiClient = axiosCreate({
   baseURL: BASE_URL,
   headers: {
     'Content-Type': 'application/json',
@@ -62,11 +62,11 @@ const flushQueue = (token: string | null, error: unknown = null) => {
 apiClient.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
     const token = useAuthStore.getState().accessToken;
- 
+
     // Don't override an Authorization header the caller already set
     // (e.g. resetPassword() sets its own Bearer <reset_token>).
     const hasExplicitAuthHeader = !!config.headers?.Authorization;
- 
+
     if (token && !isAuthRoute(config.url) && !hasExplicitAuthHeader) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -149,3 +149,5 @@ apiClient.interceptors.response.use(
     }
   }
 );
+
+export default apiClient;

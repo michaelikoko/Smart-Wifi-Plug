@@ -4,12 +4,13 @@
     "board/esp32-wrover-kit-3.3v.cfg"
   ],
   "idf.customExtraVars": {
-    "IDF_TARGET": "esp32"
+    "IDF_TARGET": "esp32c3"
   },
   "clangd.path": "/home/michaelikoko/.espressif/tools/esp-clang/esp-20.1.1_20250829/esp-clang/bin/clangd",
   "clangd.arguments": [
     "--background-index",
     "--query-driver=**",
-    "--compile-commands-dir=/home/michaelikoko/Documents/Programming/emb_c/esp-idf/pzem004t_demo/build"
-  ]
+    "--compile-commands-dir=/home/michaelikoko/Documents/Programming/smartplug/firmware/build"
+  ],
+  "idf.port": "/dev/ttyACM0"
 }

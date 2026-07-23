@@ -1,5 +1,5 @@
-import { apiClient } from './client';
-import {isAxiosError} from 'axios';
+import apiClient from './client';
+import { isAxiosError } from 'axios';
 
 export interface CurrentEnergyResponse {
     device_id: string;

@@ -2,16 +2,21 @@
 #define CONFIG_H
 
 // PZEM
-#define ESP_TX_TO_PZEM_RX_PIN 17
-#define ESP_RX_FROM_PZEM_TX_PIN 16
+//#define ESP_TX_TO_PZEM_RX_PIN 17
+//#define ESP_RX_FROM_PZEM_TX_PIN 16
+#define ESP_TX_TO_PZEM_RX_PIN 0
+#define ESP_RX_FROM_PZEM_TX_PIN 1
 #define PZEM_ADDR 0x01 // Default PZEM address
 
 // Relay
-#define RELAY_PIN 18
+//#define RELAY_PIN 18
+#define RELAY_PIN 3
 
 // WiFi - I'll change this later to read from nvs flash memory
-#define WIFI_SSID       "Wokwi-GUEST"
-#define WIFI_PASSWORD   ""
+//#define WIFI_SSID       "Wokwi-GUEST"
+//#define WIFI_PASSWORD   ""
+#define WIFI_SSID       "blah"
+#define WIFI_PASSWORD   "catnip69"
 
 // MQTT
 #define SMARTPLUG_ID        "esp32-smartplug-001" // Dummy unique ID for now

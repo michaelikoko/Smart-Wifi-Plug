@@ -115,7 +115,7 @@ export default function DeviceDetailScreen() {
         staleTime: Infinity, // home.tsx manages invalidation
     });
     const device = devices.find((d) => d.device_id === device_id);
-    
+
     useEffect(() => {
         if (!device) return;
         setDailyLimit(device.daily_limit_kwh != null ? String(device.daily_limit_kwh) : '');
@@ -123,7 +123,7 @@ export default function DeviceDetailScreen() {
         setAutoCutoff(device.auto_cutoff_enabled);
         setSaveSuccess('');
     }, [device?.daily_limit_kwh, device?.monthly_limit_kwh, device?.auto_cutoff_enabled]);
-    
+
 
     // Resolve relay state: MQTT confirmation > REST fallback
     const relayIsOn = relayConfirmed != null
@@ -331,26 +331,25 @@ export default function DeviceDetailScreen() {
                                 'rounded-2xl px-5 py-3.5 flex-row items-center gap-2 disabled:bg-muted disabled:opacity-60',
                                 isToggling || isOverLimit ? 'opacity-60 bg-muted' :
                                     relayIsOn ? 'bg-success' : 'bg-destructive',
-                                /*isToggling ? 'opacity-60 bg-muted' :
-                                    relayIsOn ? 'bg-success' : 'bg-destructive',*/
                             ].join(' ')}
                         >
-                            {isToggling ? (
+                            {isOnline ? isToggling ? (
                                 <Spinner size="small" />
                             ) : relayIsOn ? (
                                 <ToggleRight size={20} color="#fff" />
                             ) : (
                                 <ToggleLeft size={20} color="#fff" />
-                            )}
+                            ) : null}
                             <Text className="text-[13px] font-bold uppercase tracking-widest text-white">
                                 {
-                                    isToggling
-                                        ? 'Switching...'
-                                        : isOverLimit
-                                            ? 'Limit exceeded'
-                                            : relayIsOn
-                                                ? 'Turned On'
-                                                : 'Turned Off'
+                                    !isOnline ? 'Offline' :
+                                        isToggling
+                                            ? 'Switching...'
+                                            : isOverLimit
+                                                ? 'Limit exceeded'
+                                                : relayIsOn
+                                                    ? 'Turned On'
+                                                    : 'Turned Off'
                                 }
                             </Text>
                         </Pressable>
@@ -448,8 +447,10 @@ export default function DeviceDetailScreen() {
                             </Text>
                             {telemetry ? (
                                 <HStack className="items-center gap-1">
-                                    <CircleDot size={10} color="#10b981" />
-                                    <Text className="text-[10px] text-emerald-600">Live</Text>
+                                    <CircleDot size={10} color={isOnline ? "#10b981" : "#a3a3a3"} />
+                                    <Text className={`text-[10px] ${isOnline ? 'text-emerald-600' : 'text-muted-foreground'}`}>
+                                        {isOnline ? 'Live' : 'Synced'}
+                                    </Text>
                                 </HStack>
                             ) : (
                                 <Text className="text-[10px] text-muted-foreground">Waiting for data...</Text>
@@ -534,10 +535,16 @@ export default function DeviceDetailScreen() {
                             <Text className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
                                 Today&apos;s Usage
                             </Text>
-                            <HStack className="items-center gap-1">
-                                <CircleDot size={10} color="#10b981" />
-                                <Text className="text-[10px] text-emerald-600">Live</Text>
-                            </HStack>
+                            {currentEnergyReadings ? (
+                                <HStack className="items-center gap-1">
+                                    <CircleDot size={10} color={isOnline ? "#10b981" : "#a3a3a3"} />
+                                    <Text className={`text-[10px] ${isOnline ? 'text-emerald-600' : 'text-muted-foreground'}`}>
+                                        {isOnline ? 'Live' : 'Synced'}
+                                    </Text>
+                                </HStack>
+                            ) : (
+                                <Text className="text-[10px] text-muted-foreground">Waiting for data...</Text>
+                            )}
                         </HStack>
 
                         <HStack className="gap-2">
@@ -583,12 +590,16 @@ export default function DeviceDetailScreen() {
                             <Text className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
                                 This Month&apos;s Usage
                             </Text>
-                            <HStack className="items-center gap-1">
-                                <CircleDot size={10} color={monthlyEnergyReadings ? "#10b981" : "#a3a3a3"} />
-                                <Text className={`text-[10px] ${monthlyEnergyReadings ? 'text-emerald-600' : 'text-muted-foreground'}`}>
-                                    {monthlyEnergyReadings ? 'Live' : 'Synced'}
-                                </Text>
-                            </HStack>
+                            {monthlyEnergyReadings ? (
+                                <HStack className="items-center gap-1">
+                                    <CircleDot size={10} color={isOnline ? "#10b981" : "#a3a3a3"} />
+                                    <Text className={`text-[10px] ${isOnline ? 'text-emerald-600' : 'text-muted-foreground'}`}>
+                                        {isOnline ? 'Live' : 'Synced'}
+                                    </Text>
+                                </HStack>
+                            ) : (
+                                <Text className="text-[10px] text-muted-foreground">Waiting for data...</Text>
+                            )}
                         </HStack>
 
                         <HStack className="gap-2">
@@ -609,7 +620,7 @@ export default function DeviceDetailScreen() {
                                     Billing Period
                                 </Text>
                                 <Text className="text-base font-bold text-foreground mt-1">
-                                    {monthlyEnergyReadings?.month 
+                                    {monthlyEnergyReadings?.month
                                         ? new Date(monthlyEnergyReadings.month + '-02').toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
                                         : new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
                                     }

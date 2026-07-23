@@ -23,7 +23,8 @@ static int8_t get_rssi(void)
     }
     return 0;
 }
-
+/*
+Commented out to test without pzem
 static void publish_telemetry(void)
 {
     bool ok = updateValues(PZEM_ADDR);
@@ -62,11 +63,47 @@ static void publish_telemetry(void)
     ESP_LOGI(TAG, "Telemetry: %s", payload);
     free(payload);
 }
+*/
+
+static double sim_energy_wh = 0.0;
+
+static void publish_telemetry(void)
+{
+    bool relay_on = relay_get_state();
+    float voltage = 230.0f;
+    float current = relay_on ? 0.478f : 0.0f;
+    float power   = relay_on ? 80.0f : 0.0f;
+    float freq    = 50.0f;
+    float pf       = relay_on ? 0.95f : 0.0f;
+
+    // accumulate energy only while relay is on, ~10s tick matches TELEMETRY_INTERVAL_MS
+    if (relay_on) {
+        sim_energy_wh += power * (TELEMETRY_INTERVAL_MS / 1000.0 / 3600.0);
+    }
+
+    cJSON *root = cJSON_CreateObject();
+    cJSON_AddNumberToObject(root, "v", voltage);
+    cJSON_AddNumberToObject(root, "i", current);
+    cJSON_AddNumberToObject(root, "p", power);
+    cJSON_AddNumberToObject(root, "e", sim_energy_wh);
+    cJSON_AddNumberToObject(root, "f", freq);
+    cJSON_AddNumberToObject(root, "pf", pf);
+    cJSON_AddNumberToObject(root, "relay", relay_on ? 1 : 0);
+    cJSON_AddNumberToObject(root, "ts", (double)sntp_get_epoch());
+    cJSON_AddNumberToObject(root, "rssi", get_rssi());
+
+    char *payload = cJSON_PrintUnformatted(root);
+    if (!payload) { ESP_LOGE(TAG, "Failed to serialise JSON"); return; }
+
+    esp_mqtt_client_publish(mqtt_client, MQTT_TOPIC_PUB_TELEMETRY, payload, 0, 0, 0);
+    ESP_LOGI(TAG, "Telemetry (SIM): %s", payload);
+    free(payload);
+}
 
 void pzem_task(void *pvParameters)
 {
-    initialize_pzem(ESP_TX_TO_PZEM_RX_PIN, ESP_RX_FROM_PZEM_TX_PIN);
-    ESP_LOGI(TAG, "PZEM initialized");
+    //initialize_pzem(ESP_TX_TO_PZEM_RX_PIN, ESP_RX_FROM_PZEM_TX_PIN);
+    //ESP_LOGI(TAG, "PZEM initialized");
 
     while (1) {
         vTaskDelay(pdMS_TO_TICKS(TELEMETRY_INTERVAL_MS));
