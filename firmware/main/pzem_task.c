@@ -2,6 +2,7 @@
 #include "config.h"
 #include "mqtt.h"
 #include "relay.h"
+#include "mqtt_topics.h"
 #include "pzem-driver.h"
 #include "esp_log.h"
 #include "cJSON.h"
@@ -39,7 +40,7 @@ static void publish_telemetry(void)
         return;
     }
 
-    //cJSON_AddStringToObject(root, "device_id", SMARTPLUG_ID);
+    // device id omitted in this simulation build
     cJSON_AddNumberToObject(root, "v",     getVoltage());
     cJSON_AddNumberToObject(root, "i",     getCurrent());
     cJSON_AddNumberToObject(root, "p",     getPower());
@@ -58,7 +59,7 @@ static void publish_telemetry(void)
         return;
     }
 
-    esp_mqtt_client_publish(mqtt_client, MQTT_TOPIC_PUB_TELEMETRY,
+    esp_mqtt_client_publish(mqtt_client, mqtt_topic_pub_telemetry(),
                             payload, 0, 0, 0);
     ESP_LOGI(TAG, "Telemetry: %s", payload);
     free(payload);
@@ -95,7 +96,7 @@ static void publish_telemetry(void)
     char *payload = cJSON_PrintUnformatted(root);
     if (!payload) { ESP_LOGE(TAG, "Failed to serialise JSON"); return; }
 
-    esp_mqtt_client_publish(mqtt_client, MQTT_TOPIC_PUB_TELEMETRY, payload, 0, 0, 0);
+    esp_mqtt_client_publish(mqtt_client, mqtt_topic_pub_telemetry(), payload, 0, 0, 0);
     ESP_LOGI(TAG, "Telemetry (SIM): %s", payload);
     free(payload);
 }

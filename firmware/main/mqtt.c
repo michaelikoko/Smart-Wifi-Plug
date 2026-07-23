@@ -1,7 +1,9 @@
 #include <string.h>
+#include <stdio.h>
 #include "mqtt.h"
 #include "config.h"
 #include "relay.h"
+#include "mqtt_topics.h"
 #include "esp_log.h"
 #include "cJSON.h"
 #include "sntp.h"
@@ -81,12 +83,11 @@ static void mqtt_event_handler(void *args, esp_event_base_t base,
         snprintf(online_status_payload, sizeof(online_status_payload),
                  "{\"status\":\"online\",\"ts\":%lld}", (long long)sntp_get_epoch());
 
-        esp_mqtt_client_publish(client, MQTT_TOPIC_PUB_DEVICE_STATUS,
+        esp_mqtt_client_publish(client, mqtt_topic_pub_device_status(),
                                 online_status_payload, 0, 1, 1);
-        // esp_mqtt_client_publish(client, MQTT_TOPIC_PUB_DEVICE_STATUS, "{\"status\":\"online\"}", 0, 1, 1);
 
         // Subscribe to relay command topic
-        msg_id = esp_mqtt_client_subscribe(client, MQTT_TOPIC_SUB_RELAY_CONTROL, 1);
+        msg_id = esp_mqtt_client_subscribe(client, mqtt_topic_sub_relay_control(), 1);
         ESP_LOGI(TAG, "Subscribed to relay command, msg_id=%d", msg_id);
 
         // Publish initial relay state
@@ -100,7 +101,7 @@ static void mqtt_event_handler(void *args, esp_event_base_t base,
         snprintf(offline_status_payload, sizeof(offline_status_payload),
                  "{\"status\":\"offline\",\"ts\":%lld}", (long long)sntp_get_epoch());
 
-        esp_mqtt_client_publish(client, MQTT_TOPIC_PUB_DEVICE_STATUS,
+        esp_mqtt_client_publish(client, mqtt_topic_pub_device_status(),
                                 offline_status_payload, 0, 1, 1);
         break;
 
@@ -142,9 +143,11 @@ static void mqtt_event_handler(void *args, esp_event_base_t base,
 
 void mqtt_app_start(void)
 {
+    mqtt_topics_init();
+
     esp_mqtt_client_config_t cfg = {
         .broker.address.uri = MQTT_BROKER_URI,
-        .session.last_will.topic = MQTT_TOPIC_PUB_DEVICE_STATUS,
+        .session.last_will.topic = mqtt_topic_pub_device_status(),
         .session.last_will.msg = "{\"status\":\"offline\"}",
         .session.last_will.msg_len = 0,
         .session.last_will.qos = 1,

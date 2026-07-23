@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include "relay.h"
 #include "config.h"
+#include "mqtt_topics.h"
 #include "driver/gpio.h"
 #include "esp_log.h"
 #include "cJSON.h"
@@ -112,14 +113,13 @@ void relay_set_and_publish(esp_mqtt_client_handle_t client, bool state, const ch
     // snprintf(payload, sizeof(payload), "{\"state\":\"%s\",\"source\":\"%s\",\"ts\":%lld}", state ? "ON" : "OFF", source, (long long)sntp_get_epoch());
     cJSON *root = cJSON_CreateObject();
 
-    //cJSON_AddStringToObject(root, "device_id", SMARTPLUG_ID);
     cJSON_AddStringToObject(root, "state", state ? "ON" : "OFF");
     cJSON_AddStringToObject(root, "source", source);
     cJSON_AddNumberToObject(root, "ts", (double)sntp_get_epoch());
 
     char *payload = cJSON_PrintUnformatted(root);
 
-    esp_mqtt_client_publish(client, MQTT_TOPIC_PUB_RELAY_STATE,
+    esp_mqtt_client_publish(client, mqtt_topic_pub_relay_state(),
                             payload, 0, 1, 1);
     free(payload);
     cJSON_Delete(root);
