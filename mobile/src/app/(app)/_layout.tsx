@@ -116,6 +116,11 @@ export default function AppTabsLayout() {
         name="device/[device_id]"
         options={{ href: null, headerShown: false }}
       />
+      {/* Add-device flow — pushed via router.push('/(app)/add-device') from the Devices tab's "Add Device" button. */}
+      <Tabs.Screen
+        name="add-device"
+        options={{ href: null, headerShown: false }}
+      />
     </Tabs>
   );
 }

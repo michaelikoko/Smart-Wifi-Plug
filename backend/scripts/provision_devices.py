@@ -18,9 +18,9 @@ def provision_devices(device_ids: list[str]):
     unassigned device IDs into the database.
 
     To use, activate the virtual environment and run in the terminal:
-    $ python -m scripts.provision_devices.py esp32-smartplug-001
+    $ python -m scripts.provision_devices esp32-smartplug-001
     For multiple devices:
-    $ python -m scripts.provision_devices.py esp32-smartplug-002 plug_01 esp-mac-1234
+    $ python -m scripts.provision_devices esp32-smartplug-002 plug_01 esp-mac-1234
     """
     logger.info("Starting factory provisioning for %s device(s)...", len(device_ids))
     
@@ -39,7 +39,7 @@ def provision_devices(device_ids: list[str]):
             # Create the unassigned device
             new_device = Device(
                 device_id=d_id,
-                name=f"Smart Plug ({d_id[-4:]})",  # Temporary placeholder name
+                name=f"Smart Plug ({d_id[-6:]})",  # Temporary placeholder name
                 is_enabled=False,                  # Disabled until claimed by a user
                 user_id=None                       # Unassigned pool
             )
