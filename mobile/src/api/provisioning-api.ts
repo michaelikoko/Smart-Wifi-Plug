@@ -7,7 +7,7 @@ export type SubmitWifiCredentialsResponse = {
 };
 
 const provisioningClient = axiosCreate({
-  baseURL: 'http://192.168.163.30',
+  baseURL: 'http://192.168.4.1',
   timeout: 20_000,
   headers: {
     'Content-Type': 'application/json',
@@ -29,6 +29,7 @@ export async function submitWifiCredentials(
       password,
     });
 
+    console.log("Response from ESP32", response);
     const status = response.data?.status;
 
     if (isProvisioningStatus(status)) {

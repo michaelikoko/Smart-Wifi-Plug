@@ -515,9 +515,8 @@ async def start_staleness_sweep():
                     .where(Device.is_online == True)  # noqa: E712
                     .where(Device.is_enabled == True)  # noqa: E712
                     .where(
-                        #(col(Device.last_seen) == None)  # noqa: E711
-                        #| (col(Device.last_seen) < cutoff_dt)
-                         (col(Device.last_seen) < cutoff_dt) # Keep last_seen = null for registered devices that have not been provisioned
+                        (col(Device.last_seen) == None)  # noqa: E711
+                        | (col(Device.last_seen) < cutoff_dt)
                     )
                 ).all()
 

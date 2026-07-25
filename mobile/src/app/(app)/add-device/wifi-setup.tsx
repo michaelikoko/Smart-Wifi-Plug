@@ -40,7 +40,7 @@ import { getDevice } from '../../../api/devices-api';
 import { submitWifiCredentials } from '../../../api/provisioning-api';
 
 const POLL_INTERVAL_MS = 3000;
-const POLL_TIMEOUT_MS = 30_000;
+const POLL_TIMEOUT_MS = 60_000;
 
 const wifiSetupSchema = z.object({
   ssid: z.string().trim().min(1, 'Home WiFi SSID is required'),
@@ -122,7 +122,7 @@ export default function WifiSetupScreen() {
   }, [step, pollStartedAt, isDeviceOnline]);
 
   const onSubmit = (data: WifiSetupFormData) => {
-    provisionMutation.mutate(data);
+    provisionMutation.mutate({ ssid: data.ssid.trim(), password: data.password });
   };
 
   const resetToForm = () => {
@@ -130,6 +130,13 @@ export default function WifiSetupScreen() {
     setPollStartedAt(null);
     setShowPassword(false);
     provisionMutation.reset();
+  };
+
+  // NEW: Allows checking again without wiping the form state
+  const restartPolling = () => {
+    setPollAttempt((attempt) => attempt + 1);
+    setPollStartedAt(Date.now());
+    setStep('polling');
   };
 
   const renderContent = () => {
@@ -332,7 +339,7 @@ export default function WifiSetupScreen() {
               </Text>
             </VStack>
             <Text className="text-center text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
-              This can take up to 30 seconds
+              This can take up to 60 seconds
             </Text>
           </VStack>
         </Card>
@@ -410,6 +417,75 @@ export default function WifiSetupScreen() {
               Couldn&apos;t confirm connection
             </Heading>
             <Text className="text-center text-sm text-muted-foreground">
+              The plug didn&apos;t report online within our time window. If you just switched networks, it might just need another look.
+            </Text>
+          </VStack>
+          <VStack className="w-full gap-3">
+            <Button
+              size="lg"
+              className="w-full rounded-xl bg-primary py-4"
+              onPress={restartPolling}
+            >
+              <ButtonText className="uppercase tracking-widest">
+                Check Again
+              </ButtonText>
+              <ButtonIcon as={ArrowRight} />
+            </Button>
+
+            <Button
+              size="lg"
+              variant="outline"
+              className="w-full rounded-xl py-4"
+              onPress={resetToForm}
+            >
+              <ButtonText>Enter Details Again</ButtonText>
+            </Button>
+          </VStack>
+        </VStack>
+      </Card>
+    );
+};
+
+return (
+  <View className="flex-1 bg-secondary dark:bg-background">
+    <ScrollView
+      showsVerticalScrollIndicator={false}
+      contentContainerClassName="flex-grow justify-center px-5 py-6"
+    >
+      <VStack className="mx-auto w-full max-w-sm gap-5">
+        <HStack className="items-center justify-between px-1">
+          <VStack className="gap-0.5">
+            <Text className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground">
+              Add Device
+            </Text>
+            <Heading size="lg" className="text-foreground">
+              WiFi Setup
+            </Heading>
+          </VStack>
+
+          <View className="h-11 w-11 items-center justify-center rounded-2xl bg-card border border-border">
+            <PlugZap size={20} color="#737373" />
+          </View>
+        </HStack>
+
+        {renderContent()}
+      </VStack>
+    </ScrollView>
+  </View>
+);
+}
+
+/*
+      <Card size="default" className="w-full rounded-2xl">
+        <VStack className="items-center gap-5 py-2">
+          <View className="h-16 w-16 items-center justify-center rounded-2xl bg-destructive/10">
+            <WifiOff size={28} color="#E7000B" />
+          </View>
+          <VStack className="items-center gap-2">
+            <Heading size="lg" className="text-center text-foreground">
+              Couldn&apos;t confirm connection
+            </Heading>
+            <Text className="text-center text-sm text-muted-foreground">
               The plug did not report online within our time window.
             </Text>
           </VStack>
@@ -427,34 +503,4 @@ export default function WifiSetupScreen() {
           </VStack>
         </VStack>
       </Card>
-    );
-  };
-
-  return (
-    <View className="flex-1 bg-secondary dark:bg-background">
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerClassName="flex-grow justify-center px-5 py-6"
-      >
-        <VStack className="mx-auto w-full max-w-sm gap-5">
-          <HStack className="items-center justify-between px-1">
-            <VStack className="gap-0.5">
-              <Text className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground">
-                Add Device
-              </Text>
-              <Heading size="lg" className="text-foreground">
-                WiFi Setup
-              </Heading>
-            </VStack>
-
-            <View className="h-11 w-11 items-center justify-center rounded-2xl bg-card border border-border">
-              <PlugZap size={20} color="#737373" />
-            </View>
-          </HStack>
-
-          {renderContent()}
-        </VStack>
-      </ScrollView>
-    </View>
-  );
-}
+*/

@@ -126,7 +126,7 @@ static esp_err_t wifi_post_handler(httpd_req_t *req)
             wifi_provisioning_mode_active = false;
             wifi_creds_save(ssid_buf, pass_buf);
             httpd_resp_sendstr(req, "{\"status\":\"connected\"}");
-            vTaskDelay(pdMS_TO_TICKS(1000));
+            vTaskDelay(pdMS_TO_TICKS(3000));
             esp_err_t mode_err = esp_wifi_set_mode(WIFI_MODE_STA);
             if (mode_err != ESP_OK) {
                 ESP_LOGE(TAG, "Failed to drop AP mode: %s", esp_err_to_name(mode_err));
