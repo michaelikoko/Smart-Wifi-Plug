@@ -14,6 +14,7 @@
 #include "device_id.h"
 #include "mqtt_topics.h"
 #include "wifi_creds.h"
+#include "wifi_manager.h"
 #include "provisioning.h"
 
 static const char *TAG = "MAIN";
@@ -37,6 +38,8 @@ static void start_normal_services(void)
 
     // MQTT
     mqtt_app_start();
+
+    wifi_manager_init();
 
     // Tasks
     xTaskCreatePinnedToCore(pzem_task, "pzem_task", 4096, NULL, PRIORITY_PZEM, NULL, 0);

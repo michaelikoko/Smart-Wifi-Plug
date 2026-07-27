@@ -31,8 +31,8 @@ _MIN_VALID_TS = 1735689600  # Jan 1, 2026 in epoch seconds
 
 # Mirrors firmware's TELEMETRY_INTERVAL_MS. A device is considered stale (and marked offline) if last_seen is older than this.
 TELEMETRY_INTERVAL_S = 10
-STALENESS_THRESHOLD_S = TELEMETRY_INTERVAL_S * 3
-STALENESS_SWEEP_INTERVAL_S = 60
+STALENESS_THRESHOLD_S = TELEMETRY_INTERVAL_S * 2  
+STALENESS_SWEEP_INTERVAL_S = 15                     
 
 DEVICE_TOPIC_RE = re.compile(r"^smartplug/([^/]+)/")
 

@@ -21,17 +21,14 @@ import { getMe, logoutUser } from '../../api/auth-api';
 import { listDevices, type DeviceResponse } from '../../api/devices-api';
 import { subscribeToDevices, disconnectMqtt } from '../../lib/mqtt-client';
 
-
 function DeviceCard({
   device,
-  needsSetup,
   livePower,
   liveRelayOn,
   liveIsOnline,
   onPress,
 }: {
   device: DeviceResponse;
-  needsSetup: boolean;
   livePower: number | null;
   liveRelayOn: boolean;
   liveIsOnline: boolean;
@@ -41,7 +38,6 @@ function DeviceCard({
 
   return (
     <Pressable onPress={onPress} android_ripple={{ color: '#e5e5e5' }}>
-
       <Card size="sm" className="w-full rounded-2xl">
         <HStack className="items-center gap-4">
           <View className="relative">
@@ -51,7 +47,7 @@ function DeviceCard({
             <View
               className={[
                 'absolute -right-1 -top-1 h-3 w-3 rounded-full border-2 border-card',
-                needsSetup ? 'bg-warning' : liveIsOnline ? 'bg-emerald-500' : 'bg-muted-foreground',
+                liveIsOnline ? 'bg-emerald-500' : 'bg-muted-foreground',
               ].join(' ')}
             />
           </View>
@@ -61,32 +57,24 @@ function DeviceCard({
             <Text className="text-[11px] font-mono text-muted-foreground">{device.device_id}</Text>
           </VStack>
 
-          {needsSetup ? (
-            <Badge className="rounded-full bg-warning px-2.5 py-0.5">
-              <BadgeText className="text-[10px] font-bold uppercase tracking-wider text-white">
-                Finish setup
-              </BadgeText>
-            </Badge>
-          ) : (
-            <VStack className="items-end gap-1.5">
-              <Text className={`text-[13px] font-semibold ${livePower != null ? 'text-foreground' : 'text-muted-foreground italic'}`}>{powerStr}</Text>
-              <View
+          <VStack className="items-end gap-1.5">
+            <Text className={`text-[13px] font-semibold ${livePower != null ? 'text-foreground' : 'text-muted-foreground italic'}`}>{powerStr}</Text>
+            <View
+              className={[
+                'rounded-md px-2.5 py-0.5',
+                liveRelayOn ? 'bg-emerald-500' : 'bg-muted',
+              ].join(' ')}
+            >
+              <Text
                 className={[
-                  'rounded-md px-2.5 py-0.5',
-                  liveRelayOn ? 'bg-emerald-500' : 'bg-muted',
+                  'text-[10px] font-bold uppercase tracking-wider',
+                  liveRelayOn ? 'text-white' : 'text-muted-foreground',
                 ].join(' ')}
               >
-                <Text
-                  className={[
-                    'text-[10px] font-bold uppercase tracking-wider',
-                    liveRelayOn ? 'text-white' : 'text-muted-foreground',
-                  ].join(' ')}
-                >
-                  {liveRelayOn ? 'On' : 'Off'}
-                </Text>
-              </View>
-            </VStack>
-          )}
+                {liveRelayOn ? 'On' : 'Off'}
+              </Text>
+            </View>
+          </VStack>
 
           <ChevronRight size={16} color="#9ca3af" />
         </HStack>
@@ -191,11 +179,6 @@ export default function HomeScreen() {
     queryFn: listDevices,
   });
 
-  const needsSetupDevices = devices.filter((d) => d.last_seen === null);
-  const needsSetupCount = needsSetupDevices.length;
-  const firstNeedsSetupDevice = needsSetupDevices[0];
-  const setupNudgeText = `${needsSetupCount} device${needsSetupCount > 1 ? 's' : ''} need${needsSetupCount > 1 ? '' : 's'} setup`;
-
   // Subscribe to MQTT topics for all registered devices
   useEffect(() => {
     if (devices.length === 0) return;
@@ -209,11 +192,8 @@ export default function HomeScreen() {
   };
 
   // Fleet counts
-  //const onlineCount = devices.filter((d) => d.is_online).length;
-  //const offlineCount = devices.length - onlineCount;
-  const provisionedDevices = devices.filter((d) => d.last_seen !== null);
-  const onlineCount = provisionedDevices.filter((d) => getLiveOnline(d.device_id, d.is_online)).length;
-  const offlineCount = provisionedDevices.length - onlineCount;
+  const onlineCount = devices.filter((d) => getLiveOnline(d.device_id, d.is_online)).length;
+  const offlineCount = devices.length - onlineCount;
 
   // Helpers to resolve live state from MQTT store, falling back to REST
   const getLiveRelay = (deviceId: string, fallback: boolean): boolean => {
@@ -224,7 +204,7 @@ export default function HomeScreen() {
   const getLivePower = (deviceId: string): number | null =>
     liveDeviceState[deviceId]?.telemetry?.power ?? null;
 
-  const activeRelayCount = provisionedDevices.filter((d) =>
+  const activeRelayCount = devices.filter((d) =>
     getLiveRelay(d.device_id, d.relay_state)
   ).length;
 
@@ -320,25 +300,6 @@ export default function HomeScreen() {
                     ? 'All devices are operating normally.'
                     : `${offlineCount} device${offlineCount > 1 ? 's' : ''} offline.`}
           </Text>
-          {needsSetupCount > 0 ? (
-            <Pressable
-              onPress={() => router.push(
-                needsSetupCount === 1 && firstNeedsSetupDevice
-                  ? {
-                      pathname: '/(app)/add-device/wifi-setup',
-                      params: { device_id: firstNeedsSetupDevice.device_id },
-                    }
-                  : '/(app)/devices'
-              )}
-              className="self-start"
-            >
-              <Badge className="rounded-full bg-warning">
-                <BadgeText className="text-[11px] font-bold uppercase tracking-widest text-white">
-                  {setupNudgeText}
-                </BadgeText>
-              </Badge>
-            </Pressable>
-          ) : null}
         </VStack>
 
         {!isLoadingDevices && !isErrorDevices && devices.length > 0 && (
@@ -415,18 +376,10 @@ export default function HomeScreen() {
               <DeviceCard
                 key={device.device_id}
                 device={device}
-                needsSetup={device.last_seen === null}
                 livePower={getLivePower(device.device_id)}
                 liveRelayOn={getLiveRelay(device.device_id, device.relay_state)}
-                liveIsOnline={getLiveOnline(device.device_id, device.is_online)} // <-- PASS IT HERE
-                onPress={() => (
-                  device.last_seen === null
-                    ? router.push({
-                        pathname: '/(app)/add-device/wifi-setup',
-                        params: { device_id: device.device_id },
-                      })
-                    : router.push(`/(app)/device/${device.device_id}`)
-                )}
+                liveIsOnline={getLiveOnline(device.device_id, device.is_online)}
+                onPress={() => router.push(`/(app)/device/${device.device_id}`)}
               />
             ))
           )}

@@ -1,13 +1,15 @@
 import mqtt, { MqttClient } from 'mqtt';
-import { queryClient } from './query-client';
-import { useDeviceStateStore } from '../store/device-state-store';
-import type { LiveTelemetry, LiveRelayState } from '../store/device-state-store';
 import type { CurrentEnergyResponse, MonthlyEnergyResponse } from '../api/telemetry-api';
+import type { LiveRelayState, LiveTelemetry } from '../store/device-state-store';
+import { useDeviceStateStore } from '../store/device-state-store';
+import { queryClient } from './query-client';
 
 let client: MqttClient | null = null;
 let connectPromise: Promise<MqttClient> | null = null;
 
 const subscribedDeviceIds = new Set<string>();
+// One-shot listeners for wifi change results: deviceId -> callback
+const wifiChangeListeners = new Map<string, (payload: { status: 'success' | 'failed'; ts: number }) => void>();
 
 
 function getClient(): Promise<MqttClient> {
@@ -144,6 +146,27 @@ function _handleMessage(topic: string, payloadBuffer: Buffer) {
     return;
   }
 
+  if (subtopic === 'wifi/result') {
+    // Firmware payload: { status: 'success'|'failed', ts }
+    const payload = {
+      status: data.status as 'success' | 'failed',
+      ts: data.ts as number,
+    };
+
+    const listener = wifiChangeListeners.get(deviceId);
+    if (listener) {
+      try {
+        listener(payload);
+      } catch (err) {
+        console.error('[mqtt] wifi/result listener error:', err);
+      }
+      wifiChangeListeners.delete(deviceId);
+    } else {
+      console.warn(`[mqtt] wifi/result ${deviceId} - no listener registered`, payload);
+    }
+    return;
+  }
+
   if (subtopic === 'energy-event') {
     console.log(`[mqtt] energy-event ${deviceId}:`, data);
     useDeviceStateStore.getState().incrementUnreadEvents(deviceId);
@@ -161,6 +184,7 @@ function _subscribeTopicsForDevices(deviceIds: string[], c: MqttClient) {
     `smartplug/${id}/be-online-status`, // Endpoint that only the server publishes to indicate online/offline status 
     `smartplug/${id}/be-daily-summary`, // Endpoint that only the server publishes to indicate daily energy summary
     `smartplug/${id}/be-monthly-summary`, // Endpoint that only the server publishes to indicate monthly energy summary
+    `smartplug/${id}/wifi/result`, // One-shot result for wifi change commands
     `smartplug/${id}/energy-event`,
   ]);
 
@@ -209,6 +233,43 @@ export async function publishRelayCommand(
     c.publish(topic, payload, { qos: 1 }, (err) => {
       if (err) reject(err);
       else resolve();
+    });
+  });
+}
+
+export async function publishWifiChangeCommand(
+  deviceId: string,
+  ssid: string,
+  password: string
+): Promise<{ status: 'success' | 'failed' | 'timeout' }> {
+  const c = await getClient();
+
+  return new Promise((resolve) => {
+    // replace any existing listener for this device (one-shot)
+    if (wifiChangeListeners.has(deviceId)) wifiChangeListeners.delete(deviceId);
+
+    const timeoutHandle = setTimeout(() => {
+      if (wifiChangeListeners.delete(deviceId)) {
+        resolve({ status: 'timeout' });
+      }
+    }, 45000);
+
+    wifiChangeListeners.set(deviceId, (payload) => {
+      clearTimeout(timeoutHandle);
+      wifiChangeListeners.delete(deviceId);
+      resolve({ status: payload.status });
+    });
+
+    const topic = `smartplug/${deviceId}/wifi/command`;
+    const payload = JSON.stringify({ ssid, password });
+
+    c.publish(topic, payload, { qos: 1 }, (err) => {
+      if (err) {
+        if (wifiChangeListeners.delete(deviceId)) {
+          clearTimeout(timeoutHandle);
+        }
+        resolve({ status: 'timeout' });
+      }
     });
   });
 }

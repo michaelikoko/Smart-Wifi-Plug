@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router';
-import { ArrowRight, Plus, PlugZap } from 'lucide-react-native';
+import { ArrowRight, Plus, PlugZap, RefreshCw } from 'lucide-react-native';
 
 import { View } from 'react-native';
 
@@ -30,17 +30,36 @@ export default function DevicesScreen() {
               </Text>
             </VStack>
 
-            <Button
-              size="lg"
-              className="mt-2 w-full rounded-xl bg-primary py-4"
-              onPress={() => router.push('/(app)/add-device')}
-            >
-              <ButtonIcon as={Plus} />
-              <ButtonText className="uppercase tracking-widest">
-                Add Device
-              </ButtonText>
-              <ButtonIcon as={ArrowRight} />
-            </Button>
+            <VStack className="mt-2 w-full gap-3">
+              <Button
+                size="lg"
+                className="w-full rounded-xl bg-primary py-4"
+                onPress={() => router.push('/(app)/add-device')}
+              >
+                <ButtonIcon as={Plus} />
+                <ButtonText className="uppercase tracking-widest">
+                  Add Device
+                </ButtonText>
+                <ButtonIcon as={ArrowRight} />
+              </Button>
+
+              <Button
+                size="lg"
+                variant="outline"
+                className="w-full rounded-xl py-4"
+                onPress={() => router.push('/(app)/add-device/provision-device')}
+              >
+                <ButtonIcon as={RefreshCw} />
+                <ButtonText className="uppercase tracking-widest">
+                  Provision Device
+                </ButtonText>
+                <ButtonIcon as={ArrowRight} />
+              </Button>
+
+              <Text className="text-center text-xs text-muted-foreground">
+                <Text className="font-semibold">New plug?</Text> Use Add Device. <Text className="font-semibold">Re-adding after reset?</Text> Use Provision Device.
+              </Text>
+            </VStack>
           </VStack>
         </Card>
       </VStack>

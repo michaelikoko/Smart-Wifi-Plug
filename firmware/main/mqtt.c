@@ -3,6 +3,7 @@
 #include "mqtt.h"
 #include "config.h"
 #include "relay.h"
+#include "wifi_manager.h"
 #include "mqtt_topics.h"
 #include "esp_log.h"
 #include "cJSON.h"
@@ -63,6 +64,31 @@ static void handle_relay_command(esp_mqtt_client_handle_t client,
     cJSON_Delete(root);
 }
 
+static void handle_wifi_command(const char *data)
+{
+    cJSON *root = cJSON_Parse(data);
+    if (!root)
+    {
+        ESP_LOGE(TAG, "Failed to parse WiFi command JSON");
+        return;
+    }
+
+    cJSON *ssid = cJSON_GetObjectItem(root, "ssid");
+    cJSON *password = cJSON_GetObjectItem(root, "password");
+    if (!cJSON_IsString(ssid) || !cJSON_IsString(password) ||
+        ssid->valuestring == NULL || password->valuestring == NULL)
+    {
+        ESP_LOGE(TAG, "Missing or invalid 'ssid'/'password' fields");
+        cJSON_Delete(root);
+        return;
+    }
+
+    ESP_LOGI(TAG, "WiFi change requested for SSID: %s", ssid->valuestring);
+    wifi_manager_request_change(ssid->valuestring, password->valuestring);
+
+    cJSON_Delete(root);
+}
+
 static void mqtt_event_handler(void *args, esp_event_base_t base,
                                int32_t event_id, void *event_data)
 {
@@ -90,6 +116,9 @@ static void mqtt_event_handler(void *args, esp_event_base_t base,
         msg_id = esp_mqtt_client_subscribe(client, mqtt_topic_sub_relay_control(), 1);
         ESP_LOGI(TAG, "Subscribed to relay command, msg_id=%d", msg_id);
 
+        msg_id = esp_mqtt_client_subscribe(client, mqtt_topic_sub_wifi_control(), 1);
+        ESP_LOGI(TAG, "Subscribed to wifi command, msg_id=%d", msg_id);
+
         // Publish initial relay state
         relay_set_and_publish(client, relay_get_state(), "boot");
         break;
@@ -116,10 +145,15 @@ static void mqtt_event_handler(void *args, esp_event_base_t base,
 
         ESP_LOGI(TAG, "Topic: %s | Data: %s", topic, data);
 
-        if (strstr(topic, "/relay/command"))
+        if (strstr(topic, "/wifi/command"))
+        {
+            handle_wifi_command(data);
+        }
+        else if (strstr(topic, "/relay/command"))
         {
             handle_relay_command(client, data);
         }
+
         break;
     }
 

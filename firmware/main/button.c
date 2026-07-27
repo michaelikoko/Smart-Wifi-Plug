@@ -2,7 +2,9 @@
 #include "config.h"
 #include "relay.h"
 #include "mqtt.h"
+#include "wifi_creds.h"
 #include "esp_log.h"
+#include "esp_system.h"
 #include "driver/gpio.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -13,7 +15,7 @@ static const char *TAG = "BUTTON";
 typedef enum {
     PRESS_NONE,
     PRESS_SHORT,   // < 3s  → toggle relay
-    PRESS_LONG,    // >= 3s → reserved for factory reset later
+    PRESS_LONG,    // >= 3s → clear WiFi credentials and reboot
 } press_type_t;
 
 static void button_gpio_init(void)
@@ -83,8 +85,11 @@ void button_task(void *pvParameters)
             break;
 
         case PRESS_LONG:
-            // Placeholder for factory reset in a later stage
-            ESP_LOGW(TAG, "Long press detected — factory reset not yet implemented");
+            // Clear WiFi credentials and reboot into provisioning mode
+            ESP_LOGW(TAG, "Long press detected — WiFi reset triggered");
+            wifi_creds_clear();
+            vTaskDelay(pdMS_TO_TICKS(500));
+            esp_restart();
             break;
 
         case PRESS_NONE:

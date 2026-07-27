@@ -7,5 +7,7 @@ const char *mqtt_topic_pub_device_status(void);
 const char *mqtt_topic_pub_relay_state(void);
 const char *mqtt_topic_pub_telemetry(void);
 const char *mqtt_topic_sub_relay_control(void);
+const char *mqtt_topic_sub_wifi_control(void);
+const char *mqtt_topic_pub_wifi_result(void);
 
 #endif
