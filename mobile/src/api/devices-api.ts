@@ -13,6 +13,8 @@ export interface DeviceResponse {
   auto_cutoff_enabled: boolean;
   cutoff_reason: string | null;
   cutoff_at: string | null;
+  timer_lock_reason: string | null;
+  timer_locked_at: string | null;
   last_seen: string | null;
   created_at: string;
 }

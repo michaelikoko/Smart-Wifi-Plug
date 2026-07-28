@@ -1,6 +1,6 @@
 import mqtt, { MqttClient } from 'mqtt';
 import type { CurrentEnergyResponse, MonthlyEnergyResponse } from '../api/telemetry-api';
-import type { LiveRelayState, LiveTelemetry } from '../store/device-state-store';
+import type { LiveRelayState, LiveTelemetry, LiveTimerLock } from '../store/device-state-store';
 import { useDeviceStateStore } from '../store/device-state-store';
 import { queryClient } from './query-client';
 
@@ -132,6 +132,18 @@ function _handleMessage(topic: string, payloadBuffer: Buffer) {
     return;
   }
 
+  if (subtopic === 'be-timer-lock') {
+    // Backend payload: { locked: bool, reason: string|null, locked_at: iso|null }
+    console.log(`[mqtt] be-timer-lock ${deviceId} data:`, data);
+    const timerLock: LiveTimerLock = {
+      locked: Boolean(data.locked),
+      reason: (data.reason as string | null) ?? null,
+      lockedAt: (data.locked_at as string | null) ?? null,
+    };
+    useDeviceStateStore.getState().setTimerLock(deviceId, timerLock);
+    return;
+  }
+
   if (subtopic === 'be-daily-summary') {
     // Backend payload: CurrentEnergyResponse
     console.log(`[mqtt] be-daily-summary ${deviceId} data:`, data);
@@ -182,6 +194,7 @@ function _subscribeTopicsForDevices(deviceIds: string[], c: MqttClient) {
     `smartplug/${id}/telemetry`,
     `smartplug/${id}/relay/state`,
     `smartplug/${id}/be-online-status`, // Endpoint that only the server publishes to indicate online/offline status 
+    `smartplug/${id}/be-timer-lock`, // Backend retained lock state for timer enforcement
     `smartplug/${id}/be-daily-summary`, // Endpoint that only the server publishes to indicate daily energy summary
     `smartplug/${id}/be-monthly-summary`, // Endpoint that only the server publishes to indicate monthly energy summary
     `smartplug/${id}/wifi/result`, // One-shot result for wifi change commands

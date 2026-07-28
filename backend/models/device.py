@@ -6,6 +6,7 @@ if TYPE_CHECKING:
     from models.user import User
     from models.telemetry import TelemetryReading, DeviceDailySummary
     from models.energy_event import EnergyEvent
+    from models.device_timer import DeviceTimer
 
 
 class Device(SQLModel, table=True):
@@ -37,6 +38,11 @@ class Device(SQLModel, table=True):
     auto_cutoff_enabled: bool = Field(default=False, nullable=False)
     cutoff_reason: Optional[str] = None
     cutoff_at: Optional[datetime] = Field(
+        default=None,
+        sa_column=Column(DateTime(timezone=True), nullable=True),
+    )
+    timer_lock_reason: Optional[str] = Field(default=None)
+    timer_locked_at: Optional[datetime] = Field(
         default=None,
         sa_column=Column(DateTime(timezone=True), nullable=True),
     )
@@ -72,3 +78,7 @@ class Device(SQLModel, table=True):
         sa_relationship_kwargs={"cascade": "all, delete"}
     )
     energy_events: list["EnergyEvent"] = Relationship(back_populates="device")
+    timers: list["DeviceTimer"] = Relationship(
+        back_populates="device",
+        sa_relationship_kwargs={"cascade": "all, delete"}
+    )

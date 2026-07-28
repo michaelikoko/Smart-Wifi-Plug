@@ -1,5 +1,6 @@
 from .user import User
 from .device import Device
+from .device_timer import DeviceTimer
 from .telemetry import TelemetryReading, DeviceDailySummary
 from .energy_event import EnergyEvent
 from .refresh_token import RefreshToken

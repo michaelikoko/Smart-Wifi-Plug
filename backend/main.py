@@ -11,9 +11,10 @@ from routes.auth import router as auth_router
 from routes.user import router as user_router
 from routes.devices import router as devices_router
 from routes.events import router as events_router
+from routes.timers import router as timers_router
 
 # mqtt handlers
-from mqtt.handlers import fast_mqtt, register_mqtt_handlers, start_staleness_sweep
+from mqtt.handlers import fast_mqtt, register_mqtt_handlers, start_staleness_sweep, start_timer_sweep
 
 # Database
 #from db.session import create_db_and_tables
@@ -28,6 +29,7 @@ async def _lifespan(_app: FastAPI):
     #create_db_and_tables()
     register_mqtt_handlers()
     asyncio.create_task(start_staleness_sweep())
+    asyncio.create_task(start_timer_sweep())
     await fast_mqtt.mqtt_startup()
     yield
     await fast_mqtt.mqtt_shutdown()
@@ -54,6 +56,7 @@ app.include_router(auth_router, prefix=URL_PREFIX)
 app.include_router(user_router, prefix=URL_PREFIX)
 app.include_router(devices_router, prefix=URL_PREFIX)
 app.include_router(events_router, prefix=URL_PREFIX)
+app.include_router(timers_router, prefix=URL_PREFIX)
 
 @app.get(URL_PREFIX + "/ping")
 def ping():

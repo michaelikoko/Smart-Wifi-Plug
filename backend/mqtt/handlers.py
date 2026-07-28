@@ -3,12 +3,14 @@ from gmqtt import Client as MQTTClient
 from typing import Any
 import logging
 from datetime import datetime, timezone, date as date_type
+from zoneinfo import ZoneInfo
 from schemas.telemetry import TelemetryPayload, CurrentEnergyResponse, MonthlyEnergyConsumedResponse
 from db.session import SessionDep, get_session, engine
 from models.telemetry import TelemetryReading, DeviceDailySummary
 from sqlmodel import select, Session, col
 from energy_limits.enforcement import check_limits_and_get_cutoff_reason
 from models.energy_event import EnergyEvent
+from models.device_timer import DeviceTimer
 import json
 from models.device import Device
 import re
@@ -33,6 +35,8 @@ _MIN_VALID_TS = 1735689600  # Jan 1, 2026 in epoch seconds
 TELEMETRY_INTERVAL_S = 10
 STALENESS_THRESHOLD_S = TELEMETRY_INTERVAL_S * 2  
 STALENESS_SWEEP_INTERVAL_S = 15                     
+LAGOS_TZ = ZoneInfo("Africa/Lagos")
+TIMER_SWEEP_INTERVAL_S = 10
 
 DEVICE_TOPIC_RE = re.compile(r"^smartplug/([^/]+)/")
 
@@ -71,6 +75,21 @@ def _publish_online_status(device_id: str, is_online: bool):
     topic = f"smartplug/{device_id}/be-online-status"
     payload = json.dumps({"is_online": is_online})
     fast_mqtt.publish(topic, payload, qos=1, retain=True)
+
+
+def _publish_timer_lock(
+    device_id: str, locked: bool, reason: str | None, locked_at: datetime | None
+):
+    """Helper to broadcast timer-lock state to mobile clients (retained, push-on-transition, same pattern as _publish_online_status)."""
+    topic = f"smartplug/{device_id}/be-timer-lock"
+    payload = json.dumps({
+        "locked": locked,
+        "reason": reason,
+        "locked_at": locked_at.isoformat() if locked_at else None,
+    })
+    fast_mqtt.publish(topic, payload, qos=1, retain=True)
+    logger.info("Published timer lock — device=%s locked=%s", device_id, locked)
+
 
 def _publish_daily_summary(device_id: str, summary: DeviceDailySummary, billing_rate: int | None):
     """Helper to broadcast the full CurrentEnergyResponse to mobile clients."""
@@ -492,6 +511,98 @@ def register_mqtt_handlers():
     @fast_mqtt.on_disconnect()
     def on_disconnect(client: MQTTClient, packet, exc=None):
         logger.warning("MQTT disconnected — %s", exc)
+
+
+async def start_timer_sweep():
+    """
+    Second scheduler loop, structurally identical to start_staleness_sweep().
+    Every TIMER_SWEEP_INTERVAL_S, checks enabled timers against the current
+    Africa/Lagos local time. A timer "fires" once per day, the first sweep
+    after its trigger time has passed (self-healing if the server was down
+    at the exact minute — it fires late on the next sweep rather than never,
+    as long as the day hasn't rolled over).
+
+    Fire-and-forget: publishes the relay command the same way auto-cutoff
+    does (_publish_relay_command) with no delivery confirmation awaited.
+    """
+    logger.info(
+        "Starting timer sweep — interval=%ds, tz=Africa/Lagos", TIMER_SWEEP_INTERVAL_S
+    )
+    while True:
+        await asyncio.sleep(TIMER_SWEEP_INTERVAL_S)
+        try:
+            now_local = datetime.now(LAGOS_TZ)
+            now_hhmm = now_local.strftime("%H:%M")
+            today_local = now_local.date()
+
+            with Session(engine) as session:
+                due_timers = session.exec(
+                    select(DeviceTimer)
+                    .where(DeviceTimer.is_enabled == True)  # noqa: E712
+                    .where(DeviceTimer.time <= now_hhmm)
+                    .where(
+                        (col(DeviceTimer.last_triggered_date) == None)  # noqa: E711
+                        | (col(DeviceTimer.last_triggered_date) != today_local)
+                    )
+                ).all()
+
+                if not due_timers:
+                    continue
+
+                for timer in due_timers:
+                    device = session.exec(
+                        select(Device)
+                        .where(Device.device_id == timer.device_id)
+                        .where(Device.is_enabled == True)  # noqa: E712
+                    ).first()
+
+                    if not device:
+                        # Orphaned timer (device soft-deleted/unclaimed) — mark
+                        # as handled today so it doesn't retry every sweep.
+                        timer.last_triggered_date = today_local
+                        session.add(timer)
+                        session.commit()
+                        continue
+
+                    relay_on = timer.action == "ON"
+                    label = timer.name or f"Timer ({timer.time})"
+
+                    if relay_on and device.cutoff_reason:
+                        # Device is currently cut off for exceeding an energy
+                        # limit — an ON timer must not override that. Leave
+                        # last_triggered_date untouched so this timer stays
+                        # "due" and is retried on the next sweep, firing as
+                        # soon as the cutoff clears (or naturally rolling
+                        # over to tomorrow if it never does).
+                        logger.info(
+                            "Timer skipped — device=%s name=%s blocked by active cutoff (%s)",
+                            timer.device_id, label, device.cutoff_reason,
+                        )
+                        continue
+
+                    _publish_relay_command(timer.device_id, relay_on)
+
+                    reason = f"Turned {'ON' if relay_on else 'OFF'} by '{label}' at {timer.time}"
+                    now_utc = datetime.now(timezone.utc)
+
+                    device.timer_lock_reason = reason
+                    device.timer_locked_at = now_utc
+                    device.relay_state = relay_on
+                    timer.last_triggered_date = today_local
+
+                    session.add(device)
+                    session.add(timer)
+                    session.commit()
+
+                    _publish_timer_lock(timer.device_id, True, reason, now_utc)
+
+                    logger.info(
+                        "Timer fired — device=%s action=%s name=%s",
+                        timer.device_id, timer.action, label,
+                    )
+
+        except Exception as e:
+            logger.error("Timer sweep error: %s", e)
 
 
 async def start_staleness_sweep():

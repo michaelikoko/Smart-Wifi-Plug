@@ -21,9 +21,16 @@ export interface LiveRelayState {
   receivedAt: number;
 }
 
+export interface LiveTimerLock {
+  locked: boolean;
+  reason: string | null;
+  lockedAt: string | null;
+}
+
 interface DeviceStateEntry {
   telemetry: LiveTelemetry | null;
   relayState: LiveRelayState | null;
+  timerLock: LiveTimerLock | null;
   isOnline: boolean | null; 
   currentEnergyReadings: CurrentEnergyResponse | null; 
   monthlyEnergyReadings: MonthlyEnergyResponse | null;  
@@ -38,6 +45,7 @@ interface DeviceStateStore {
   setCurrentEnergyReadings: (deviceId: string, data: CurrentEnergyResponse) => void;
   setMonthlyEnergyReadings: (deviceId: string, data: MonthlyEnergyResponse) => void;
   setRelayState: (deviceId: string, data: LiveRelayState) => void;
+  setTimerLock: (deviceId: string, data: LiveTimerLock) => void;
   incrementUnreadEvents: (deviceId: string) => void;
   clearUnreadEvents: (deviceId: string) => void;
   totalUnreadEvents: () => number;
@@ -48,6 +56,7 @@ interface DeviceStateStore {
 const DEFAULT_ENTRY: DeviceStateEntry = {
   telemetry: null,
   relayState: null,
+  timerLock: null,
   isOnline: null,
   currentEnergyReadings: null,
   monthlyEnergyReadings: null, // Added property for monthly energy readings
@@ -106,6 +115,17 @@ export const useDeviceStateStore = create<DeviceStateStore>((set, get) => ({
         [deviceId]: {
           ...(state.devices[deviceId] ?? DEFAULT_ENTRY),
           relayState: data,
+        },
+      },
+    })),
+
+  setTimerLock: (deviceId, data) =>
+    set((state) => ({
+      devices: {
+        ...state.devices,
+        [deviceId]: {
+          ...(state.devices[deviceId] ?? DEFAULT_ENTRY),
+          timerLock: data,
         },
       },
     })),

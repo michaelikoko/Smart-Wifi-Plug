@@ -24,6 +24,8 @@ class DeviceResponse(BaseModel):
     auto_cutoff_enabled: bool = False
     cutoff_reason: Optional[str] = None
     cutoff_at: Optional[datetime] = None
+    timer_lock_reason: Optional[str] = None
+    timer_locked_at: Optional[datetime] = None
     last_seen:  Optional[datetime]
     created_at: Optional[datetime]
     updated_at: Optional[datetime]
