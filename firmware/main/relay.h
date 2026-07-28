@@ -13,4 +13,5 @@ void relay_set_and_publish(esp_mqtt_client_handle_t client, bool state, const ch
 bool relay_get_state(void);
 void relay_save_state(bool state);   // write to NVS
 bool relay_load_state(void);         // read from NVS, returns saved state or false as default
+void relay_set_state_local(bool state);
 #endif

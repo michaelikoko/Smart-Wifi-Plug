@@ -114,6 +114,14 @@ void relay_set_and_publish(esp_mqtt_client_handle_t client, bool state, const ch
     cJSON_Delete(root);
 }
 
+void relay_set_state_local(bool state)
+{
+    gpio_set_level(RELAY_PIN, state ? 1 : 0);
+    relay_state = state;
+    relay_save_state(state);
+    ESP_LOGI(TAG, "Relay → %s (local only, no MQTT publish)", state ? "ON" : "OFF");
+}
+
 bool relay_get_state(void)
 {
     return relay_state;
