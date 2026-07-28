@@ -23,8 +23,8 @@ import axios, {
 } from 'axios';
 import { useAuthStore } from '../store/auth-store';
 
-//const BASE_URL = 'http://192.168.179.30:8000/api/v1';
-const BASE_URL = 'https://7206-102-89-23-20.ngrok-free.app/api/v1';
+const BASE_URL = 'http://192.168.238.30:8000/api/v1';
+//const BASE_URL = 'https://7206-102-89-23-20.ngrok-free.app/api/v1';
 
 const apiClient = axiosCreate({
   baseURL: BASE_URL,

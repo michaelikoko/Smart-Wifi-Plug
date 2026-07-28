@@ -34,7 +34,11 @@ function DeviceCard({
   liveIsOnline: boolean;
   onPress: () => void;
 }) {
-  const powerStr = livePower != null ? `${livePower.toFixed(1)} W` : device.is_online ? 'Loading...' : 'Offline';
+  const powerStr = !liveIsOnline
+    ? 'Offline'
+    : livePower != null
+      ? `${livePower.toFixed(1)} W`
+      : 'Loading...';
 
   return (
     <Pressable onPress={onPress} android_ripple={{ color: '#e5e5e5' }}>
@@ -58,22 +62,25 @@ function DeviceCard({
           </VStack>
 
           <VStack className="items-end gap-1.5">
-            <Text className={`text-[13px] font-semibold ${livePower != null ? 'text-foreground' : 'text-muted-foreground italic'}`}>{powerStr}</Text>
-            <View
-              className={[
-                'rounded-md px-2.5 py-0.5',
-                liveRelayOn ? 'bg-emerald-500' : 'bg-muted',
-              ].join(' ')}
-            >
-              <Text
+            <Text className={`text-[13px] font-semibold ${livePower != null && liveIsOnline ? 'text-foreground' : 'text-muted-foreground italic'}`}>{powerStr}</Text>
+            {
+              liveIsOnline &&
+              <View
                 className={[
-                  'text-[10px] font-bold uppercase tracking-wider',
-                  liveRelayOn ? 'text-white' : 'text-muted-foreground',
+                  'rounded-md px-2.5 py-0.5',
+                  liveRelayOn ? 'bg-emerald-500' : 'bg-muted',
                 ].join(' ')}
               >
-                {liveRelayOn ? 'On' : 'Off'}
-              </Text>
-            </View>
+                <Text
+                  className={[
+                    'text-[10px] font-bold uppercase tracking-wider',
+                    liveRelayOn ? 'text-white' : 'text-muted-foreground',
+                  ].join(' ')}
+                >
+                  {liveRelayOn ? 'On' : 'Off'}
+                </Text>
+              </View>
+            }
           </VStack>
 
           <ChevronRight size={16} color="#9ca3af" />

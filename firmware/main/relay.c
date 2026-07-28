@@ -89,12 +89,6 @@ void relay_init(void)
 
     ESP_LOGI(TAG, "Relay initialized — %s (restored from NVS)",
              relay_state ? "ON" : "OFF");
-
-    // gpio_set_level(RELAY_PIN, 0); // default OFF
-    //// Maybe read initial state from NVS or some other history
-    // relay_state = false;
-
-    // ESP_LOGI(TAG, "Relay initialized — OFF");
 }
 
 void relay_set_and_publish(esp_mqtt_client_handle_t client, bool state, const char *source)
@@ -103,14 +97,9 @@ void relay_set_and_publish(esp_mqtt_client_handle_t client, bool state, const ch
     relay_state = state;
     ESP_LOGI(TAG, "Relay → %s", state ? "ON" : "OFF");
 
-    // char payload[32];
-    // snprintf(payload, sizeof(payload), "{\"state\":\"%s\"}", state ? "ON" : "OFF");
-
     // Persist new state to NVS
-    // relay_save_state(state);
+    relay_save_state(state);
 
-    // char payload[96];
-    // snprintf(payload, sizeof(payload), "{\"state\":\"%s\",\"source\":\"%s\",\"ts\":%lld}", state ? "ON" : "OFF", source, (long long)sntp_get_epoch());
     cJSON *root = cJSON_CreateObject();
 
     cJSON_AddStringToObject(root, "state", state ? "ON" : "OFF");

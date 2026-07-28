@@ -16,7 +16,7 @@ export function OtpInput({
   value: string;
   onChange: (v: string) => void;
 }) {
-  const inputs = useRef<Array<TextInput | null>>([]);
+  const inputs = useRef<(TextInput | null)[]>([]);
 
   // Ensure our ref tracking array is correctly sized on render
   if (inputs.current.length !== length) {
@@ -86,6 +86,7 @@ export interface WeeklyBarDatum {
   date: string;  // ISO date string "YYYY-MM-DD"
   kwh: number;   // raw kWh value for this day
   costKobo: number | null; // The cost in kobo from the backend
+  label?: string; // optional pre-built label; overrides the auto day+day-of-month format below
 }
 const WEEKLY_COLORS = [
   '#10b981', // Emerald Green (Monday)
@@ -96,7 +97,7 @@ const WEEKLY_COLORS = [
   '#ec4899', // Pink (Saturday)
   '#06b6d4', // Cyan (Sunday)
 ];
-export function WeeklyBars({ data }: { data: WeeklyBarDatum[] }) {
+export function WeeklyBars({ data, title = 'Weekly Consumption' }: { data: WeeklyBarDatum[]; title?: string }) {
   const { width } = useWindowDimensions();
   const hasData = data.length > 0;
   const formatDate = (dateStr: string) =>
@@ -118,7 +119,7 @@ export function WeeklyBars({ data }: { data: WeeklyBarDatum[] }) {
 
     return {
       ...d,
-      label: `${d.day}\n${dayOfMonth}`,
+      label: d.label ?? `${d.day}\n${dayOfMonth}`,
       value: d.kwh,
       costFormatted: costValue > 0 ? `₦${costValue.toFixed(2)}` : '₦0.00',
       frontColor: WEEKLY_COLORS[idx % WEEKLY_COLORS.length],
@@ -130,7 +131,7 @@ export function WeeklyBars({ data }: { data: WeeklyBarDatum[] }) {
   return (
     <VStack className="gap-3">
       <Text className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-        Weekly Consumption
+        {title}
       </Text>
       {rangeLabel ? (
         <Text className="text-[11px] font-semibold text-muted-foreground">
@@ -183,6 +184,57 @@ export function WeeklyBars({ data }: { data: WeeklyBarDatum[] }) {
 }
 
 
+export function RangeToggle({
+  value,
+  onChange,
+}: {
+  value: 'weekly' | 'monthly';
+  onChange: (v: 'weekly' | 'monthly') => void;
+}) {
+  return (
+    <HStack className="gap-2 rounded-xl bg-secondary p-1">
+      {(['weekly', 'monthly'] as const).map((option) => (
+        <Pressable
+          key={option}
+          onPress={() => onChange(option)}
+          className={[
+            'flex-1 items-center justify-center rounded-lg py-2',
+            value === option ? 'bg-card' : '',
+          ].join(' ')}
+        >
+          <Text
+            className={[
+              'text-[12px] font-bold uppercase tracking-widest',
+              value === option ? 'text-foreground' : 'text-muted-foreground',
+            ].join(' ')}
+          >
+            {option}
+          </Text>
+        </Pressable>
+      ))}
+    </HStack>
+  );
+}
+
+
+export function TrendBadge({ current, previous }: { current: number; previous: number }) {
+  if (previous <= 0) return null; // nothing meaningful to compare against
+  const pctChange = ((current - previous) / previous) * 100;
+  const isUp = pctChange > 0;
+  const isFlat = Math.abs(pctChange) < 0.5;
+
+  if (isFlat) {
+    return <Text className="text-[11px] font-semibold text-muted-foreground">No change</Text>;
+  }
+
+  return (
+    <Text className={`text-[11px] font-semibold ${isUp ? 'text-destructive' : 'text-emerald-600'}`}>
+      {isUp ? '▲' : '▼'} {Math.abs(pctChange).toFixed(0)}% vs. previous period
+    </Text>
+  );
+}
+
+
 export function MetricCard({ label, value, unit }: { label: string; value: string; unit?: string }) {
   return (
     <VStack className="flex-1 gap-1.5 rounded-xl border border-border bg-secondary p-4">
@@ -227,7 +279,7 @@ export function RelayRow({
         onPress={onToggle}
         disabled={isToggling}
         className={[
-          'rounded-lg px-4 py-2 min-w-[52px] items-center',
+          'rounded-lg px-4 py-2 min-w-13 items-center',
           active ? 'bg-emerald-500' : 'bg-muted',
           isToggling ? 'opacity-60' : '',
         ].join(' ')}

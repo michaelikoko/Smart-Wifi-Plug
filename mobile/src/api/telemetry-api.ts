@@ -1,5 +1,5 @@
-import apiClient from './client';
 import { isAxiosError } from 'axios';
+import apiClient from './client';
 
 export interface CurrentEnergyResponse {
     device_id: string;
@@ -120,3 +120,22 @@ export function is404(error: unknown): boolean {
     */
     return isAxiosError(error) && error.response?.status === 404;
 }
+
+
+export const getEnergyHistorySafe = async (
+    deviceId: string,
+    days = 7
+): Promise<EnergyConsumedResponse[]> => {
+    /*
+    Same as getEnergyHistory, but returns [] instead of throwing on a 404
+    ("no history yet" is a normal state for a freshly-registered device,
+    not an error worth surfacing per-device in a fleet-wide screen).
+    Other errors (network, 5xx) still throw.
+    */
+    try {
+        return await getEnergyHistory(deviceId, days);
+    } catch (error) {
+        if (is404(error)) return [];
+        throw error;
+    }
+};
