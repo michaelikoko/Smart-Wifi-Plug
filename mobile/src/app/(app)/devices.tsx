@@ -56,9 +56,14 @@ export default function DevicesScreen() {
                 <ButtonIcon as={ArrowRight} />
               </Button>
 
-              <Text className="text-center text-xs text-muted-foreground">
-                <Text className="font-semibold">New plug?</Text> Use Add Device. <Text className="font-semibold">Re-adding after reset?</Text> Use Provision Device.
-              </Text>
+              <VStack className="w-full items-start gap-1 px-1">
+                <Text className="text-xs text-muted-foreground">
+                  <Text className="font-semibold text-foreground">New plug?</Text> Use Add Device.
+                </Text>
+                <Text className="text-xs text-muted-foreground">
+                  <Text className="font-semibold text-foreground">Re-adding after reset?</Text> Use Provision Device.
+                </Text>
+              </VStack>
             </VStack>
           </VStack>
         </Card>

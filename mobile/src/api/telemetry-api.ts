@@ -139,3 +139,38 @@ export const getEnergyHistorySafe = async (
         throw error;
     }
 };
+
+export const getEnergyHistoryRange = async (
+    deviceId: string,
+    startDate: string, // "YYYY-MM-DD"
+    endDate: string,   // "YYYY-MM-DD"
+): Promise<EnergyConsumedResponse[]> => {
+    /*
+    GET /telemetry/{device_id}/energy/history?start_date=...&end_date=...
+    Returns one EnergyConsumedResponse per day within the inclusive range,
+    DESC order (newest first). 404 if no rows exist in that range.
+    */
+    const response = await apiClient.get<EnergyConsumedResponse[]>(
+        `/telemetry/${deviceId}/energy/history`,
+        { params: { start_date: startDate, end_date: endDate } }
+    );
+    return response.data;
+};
+
+export const getEnergyHistoryRangeSafe = async (
+    deviceId: string,
+    startDate: string,
+    endDate: string,
+): Promise<EnergyConsumedResponse[]> => {
+    /*
+    Same as getEnergyHistoryRange, but returns [] instead of throwing on a 404
+    — an empty month (e.g. before the device was registered) is a normal
+    state for the month picker, not an error.
+    */
+    try {
+        return await getEnergyHistoryRange(deviceId, startDate, endDate);
+    } catch (error) {
+        if (is404(error)) return [];
+        throw error;
+    }
+};

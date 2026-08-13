@@ -1,11 +1,23 @@
 import { HStack } from '@/components/ui/hstack';
 import { Text } from '@/components/ui/text';
 import { VStack } from '@/components/ui/vstack';
-import { useRef } from 'react';
-import { Pressable, TextInput, View, useWindowDimensions } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { Pressable, TextInput, View, useWindowDimensions, ScrollView } from 'react-native';
+import { ChevronLeft, ChevronRight } from 'lucide-react-native';
 import { BarChart } from 'react-native-gifted-charts';
 import { Spinner } from './ui/spinner';
 
+export type AlertState = {
+  title: string;
+  description: string;
+  action: 'error' | 'success' | 'warning' | 'info';
+} | null;
+
+export function useAlertState() {
+  const [alert, setAlert] = useState<AlertState>(null);
+  const clearAlert = () => setAlert(null);
+  return { alert, setAlert, clearAlert } as const;
+}
 
 export function OtpInput({
   length = 6,
@@ -18,7 +30,9 @@ export function OtpInput({
 }) {
   const inputs = useRef<(TextInput | null)[]>([]);
 
-  // Ensure our ref tracking array is correctly sized on render
+  //useEffect(() => {
+  //  inputs.current = Array(length).fill(null);
+  //}, [length]);
   if (inputs.current.length !== length) {
     inputs.current = Array(length).fill(null);
   }
@@ -97,9 +111,17 @@ const WEEKLY_COLORS = [
   '#ec4899', // Pink (Saturday)
   '#06b6d4', // Cyan (Sunday)
 ];
+
+const BAR_WIDTH = 22;
+const BAR_SPACING = 14;
+const SCROLL_THRESHOLD = 10;
+const TOOLTIP_BUFFER = 60; // room for the tooltip to render without clipping at either edge
+
 export function WeeklyBars({ data, title = 'Weekly Consumption' }: { data: WeeklyBarDatum[]; title?: string }) {
   const { width } = useWindowDimensions();
   const hasData = data.length > 0;
+  const isScrollable = data.length > SCROLL_THRESHOLD;
+
   const formatDate = (dateStr: string) =>
     new Intl.DateTimeFormat('en-US', {
       month: 'short',
@@ -112,7 +134,6 @@ export function WeeklyBars({ data, title = 'Weekly Consumption' }: { data: Weekl
       ? `${formatDate(data[0].date)} – ${formatDate(data[data.length - 1].date)}`
       : '';
 
-  // 1. Prepare data for the chart
   const barData = data.map((d, idx) => {
     const costValue = d.costKobo != null ? d.costKobo / 100 : 0;
     const dayOfMonth = new Date(`${d.date}T00:00:00Z`).getUTCDate();
@@ -128,6 +149,10 @@ export function WeeklyBars({ data, title = 'Weekly Consumption' }: { data: Weekl
 
   const maxKwh = hasData ? Math.max(...barData.map((d) => d.value), 0.001) : 1;
 
+  const viewportWidth = width - 110;
+  const barsWidth = barData.length * (BAR_WIDTH + BAR_SPACING);
+  const chartWidth = isScrollable ? barsWidth + TOOLTIP_BUFFER : viewportWidth;
+
   return (
     <VStack className="gap-3">
       <Text className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
@@ -141,36 +166,41 @@ export function WeeklyBars({ data, title = 'Weekly Consumption' }: { data: Weekl
 
       <View className="rounded-xl border border-border bg-secondary p-4">
         {hasData ? (
-          <BarChart
-            data={barData}
-            height={150}
-            // Make the chart responsive to the card width (padding buffer)
-            width={width - 110}
-            barWidth={22}
-            spacing={14}
-            roundedTop
-            hideRules
-            xAxisThickness={0}
-            yAxisThickness={0}
-            yAxisTextStyle={{ color: '#737373', fontSize: 10 }}
-            xAxisLabelTextStyle={{ color: '#737373', fontSize: 9, textAlign: 'center' }}
-            xAxisLabelsVerticalShift={5}
-            maxValue={maxKwh}
-            noOfSections={4}
-            yAxisExtraHeight={50}
-            renderTooltip={(item: any) => {
-              return (
+          <ScrollView
+            horizontal
+            scrollEnabled={isScrollable}
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ paddingRight: TOOLTIP_BUFFER }}
+          >
+            <BarChart
+              data={barData}
+              height={150}
+              width={chartWidth}
+              barWidth={BAR_WIDTH}
+              spacing={BAR_SPACING}
+              roundedTop
+              hideRules
+              xAxisThickness={0}
+              yAxisThickness={0}
+              yAxisTextStyle={{ color: '#737373', fontSize: 10 }}
+              xAxisLabelTextStyle={{ color: '#737373', fontSize: 9, textAlign: 'center' }}
+              xAxisLabelsVerticalShift={5}
+              maxValue={maxKwh}
+              noOfSections={4}
+              yAxisExtraHeight={50}
+              disableScroll
+              renderTooltip={(item: any) => (
                 <View className="mb-2 items-center justify-center rounded-md bg-foreground px-2 py-1 shadow-lg">
                   <Text className="text-[10px] font-bold text-background">
-                    {formatDate(item.date)} · {item.value.toFixed(2)} kWh
+                    {item.day} · {formatDate(item.date)} · {item.value.toFixed(2)} kWh
                   </Text>
                   <Text className="text-[9px] text-muted">
                     {item.costFormatted}
                   </Text>
                 </View>
-              );
-            }}
-          />
+              )}
+            />
+          </ScrollView>
         ) : (
           <View className="h-37.5 items-center justify-center">
             <Text className="text-center text-[11px] text-muted-foreground">
@@ -180,6 +210,76 @@ export function WeeklyBars({ data, title = 'Weekly Consumption' }: { data: Weekl
         )}
       </View>
     </VStack>
+  );
+}
+
+export function MonthPicker({
+  monthKey,
+  onPrev,
+  onNext,
+  canGoNext,
+}: {
+  monthKey: string;
+  onPrev: () => void;
+  onNext: () => void;
+  canGoNext: boolean;
+}) {
+  const label = new Date(`${monthKey}-02T00:00:00Z`).toLocaleDateString('en-US', {
+    month: 'long',
+    year: 'numeric',
+    timeZone: 'UTC',
+  });
+
+  return (
+    <HStack className="items-center justify-between rounded-xl bg-secondary px-2 py-2">
+      <Pressable
+        onPress={onPrev}
+        className="h-9 w-9 items-center justify-center rounded-lg active:opacity-70"
+      >
+        <ChevronLeft size={18} color="#171717" />
+      </Pressable>
+      <Text className="text-[13px] font-bold text-foreground">{label}</Text>
+      <Pressable
+        onPress={onNext}
+        disabled={!canGoNext}
+        className="h-9 w-9 items-center justify-center rounded-lg active:opacity-70 disabled:opacity-30"
+      >
+        <ChevronRight size={18} color="#171717" />
+      </Pressable>
+    </HStack>
+  );
+}
+
+
+export function ChartGranularityToggle({
+  value,
+  onChange,
+}: {
+  value: 'daily' | 'weekly';
+  onChange: (v: 'daily' | 'weekly') => void;
+}) {
+  return (
+    <HStack className="gap-2 rounded-xl bg-secondary p-1">
+      {(['daily', 'weekly'] as const).map((option) => (
+        <Pressable
+          key={option}
+          onPress={() => onChange(option)}
+          className={[
+            'flex-1 items-center justify-center rounded-lg py-2',
+            value === option ? 'bg-card' : '',
+          ].join(' ')}
+        >
+          <Text
+            className={[
+              'text-[12px] font-bold uppercase tracking-widest',
+              value === option ? 'text-foreground' : 'text-muted-foreground',
+            ].join(' ')}
+          >
+            {option}
+          </Text>
+        </Pressable>
+      ))}
+    </HStack>
   );
 }
 

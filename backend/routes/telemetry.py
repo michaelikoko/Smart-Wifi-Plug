@@ -128,17 +128,22 @@ def get_today_energy(
 @router.get(
     "/{device_id}/energy/history",
     response_model=list[EnergyConsumedResponse],
-    summary="Daily energy consumption for the past N days",
+    summary="Daily energy consumption for the past N days, or a specific date range",
 )
 def get_energy_history(
     device_id: str,
     session: SessionDep,
     current_user: CurrentActiveUser,
     days: int = Query(default=7, le=90),
+    start_date: Optional[date_type] = Query(default=None),
+    end_date: Optional[date_type] = Query(default=None),
 ):
     """
     Returns one row per day showing kWh consumed.
     Useful for the 7-day bar chart in the mobile app dashboard.
+    If start_date and end_date are both provided, returns rows in that
+    inclusive range instead of the last `days` days (days is ignored in
+    that case). Both must be provided together.
     """
     # Verify ownership - Change this to a middleware
     device = session.exec(
@@ -151,12 +156,25 @@ def get_energy_history(
     if not device:
         raise HTTPException(403, "Device not found or access denied")
     
-    summaries = session.exec(
-        select(DeviceDailySummary)
-        .where(DeviceDailySummary.device_id == device_id)
-        .order_by(desc(DeviceDailySummary.date))
-        .limit(days)
-    ).all()
+    if (start_date is None) != (end_date is None):
+        raise HTTPException(400, "start_date and end_date must be provided together")
+
+    if start_date is not None and end_date is not None and start_date > end_date:
+        raise HTTPException(400, "start_date must not be after end_date")
+
+    query = select(DeviceDailySummary).where(DeviceDailySummary.device_id == device_id)
+
+    if start_date is not None and end_date is not None:
+        query = (
+            query
+            .where(DeviceDailySummary.date >= start_date)
+            .where(DeviceDailySummary.date <= end_date)
+            .order_by(desc(DeviceDailySummary.date))
+        )
+    else:
+        query = query.order_by(desc(DeviceDailySummary.date)).limit(days)
+
+    summaries = session.exec(query).all()
 
     if not summaries:
         raise HTTPException(404, f"No energy history for device '{device_id}'")
