@@ -1,7 +1,7 @@
 import { HStack } from '@/components/ui/hstack';
 import { Text } from '@/components/ui/text';
 import { VStack } from '@/components/ui/vstack';
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { Pressable, TextInput, View, useWindowDimensions, ScrollView } from 'react-native';
 import { ChevronLeft, ChevronRight } from 'lucide-react-native';
 import { BarChart } from 'react-native-gifted-charts';
@@ -29,10 +29,6 @@ export function OtpInput({
   onChange: (v: string) => void;
 }) {
   const inputs = useRef<(TextInput | null)[]>([]);
-
-  //useEffect(() => {
-  //  inputs.current = Array(length).fill(null);
-  //}, [length]);
   if (inputs.current.length !== length) {
     inputs.current = Array(length).fill(null);
   }

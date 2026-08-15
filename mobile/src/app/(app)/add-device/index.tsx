@@ -157,7 +157,6 @@ export default function AddDeviceScreen() {
                         value={value}
                         onChangeText={onChange}
                         placeholder="esp32-smartplug-XXXXXX"
-                        //autoCapitalize="characters"
                         autoCorrect={false}
                       />
                     </Input>

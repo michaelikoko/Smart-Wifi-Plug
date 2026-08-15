@@ -103,7 +103,6 @@ export default function RegisterScreen() {
         action: 'success',
       });
       reset();
-      //router.push('/(auth)/otp-verify');
     },
     onError: (error) => {
       const message = {

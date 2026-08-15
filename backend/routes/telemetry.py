@@ -4,8 +4,7 @@ from datetime import datetime, timezone, date as date_type
 from db.session import SessionDep
 from sqlmodel import select, desc
 from models.telemetry import TelemetryReading, DeviceDailySummary
-from auth.dependencies import CurrentActiveUser
-from models.device import Device
+from auth.dependencies import CurrentActiveUser, get_owned_device
 from typing import Optional
 
 router = APIRouter(prefix="/telemetry", tags=["telemetry"])
@@ -39,18 +38,8 @@ def get_telemetry(
     offset: int = Query(default=0, ge=0)
 ):
     """Endpoint to get the most recent telemetry data saved in the database"""
-    
-    # Verify ownership - Change this to a middleware
-    device = session.exec(
-        select(Device)
-        .where(Device.device_id == device_id)
-        .where(Device.user_id == current_user.id)
-        .where(Device.is_enabled == True)  # noqa: E712
-    ).first()
+    get_owned_device(device_id, current_user.id, session)
 
-    if not device:
-        raise HTTPException(403, "Device not found or access denied")
-    
     readings = session.exec(
         select(TelemetryReading)
         .where(TelemetryReading.device_id == device_id)
@@ -84,17 +73,8 @@ def get_today_energy(
     kwh_consumed = energy_last - energy_first for today.
     Updated every time a telemetry message is received.
     """
-    # Verify ownership - Change this to a middleware
-    device = session.exec(
-        select(Device)
-        .where(Device.device_id == device_id)
-        .where(Device.user_id == current_user.id)
-        .where(Device.is_enabled == True)  # noqa: E712
-    ).first()
+    get_owned_device(device_id, current_user.id, session)
 
-    if not device:
-        raise HTTPException(403, "Device not found or access denied")
-    
     today = datetime.fromtimestamp(datetime.now(timezone.utc).timestamp(), tz=timezone.utc).date()
 
     summary = session.exec(
@@ -145,17 +125,8 @@ def get_energy_history(
     inclusive range instead of the last `days` days (days is ignored in
     that case). Both must be provided together.
     """
-    # Verify ownership - Change this to a middleware
-    device = session.exec(
-        select(Device)
-        .where(Device.device_id == device_id)
-        .where(Device.user_id == current_user.id)
-        .where(Device.is_enabled == True)  # noqa: E712
-    ).first()
+    get_owned_device(device_id, current_user.id, session)
 
-    if not device:
-        raise HTTPException(403, "Device not found or access denied")
-    
     if (start_date is None) != (end_date is None):
         raise HTTPException(400, "start_date and end_date must be provided together")
 
@@ -209,16 +180,7 @@ def get_monthly_energy(
     Returns the sum of kwh_consumed across all DeviceDailySummary rows
     for the current calendar month (UTC).
     """
-    # Verify ownership - Change this to a middleware
-    device = session.exec(
-        select(Device)
-        .where(Device.device_id == device_id)
-        .where(Device.user_id == current_user.id)
-        .where(Device.is_enabled == True)  # noqa: E712
-    ).first()
-
-    if not device:
-        raise HTTPException(403, "Device not found or access denied")
+    get_owned_device(device_id, current_user.id, session)
 
     now = datetime.now(timezone.utc)
     month_start = date_type(now.year, now.month, 1)

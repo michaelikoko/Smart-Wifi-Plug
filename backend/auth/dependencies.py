@@ -14,6 +14,7 @@ from models.user import User
 from schemas.auth import AccessTokenPayload, RefreshTokenPayload, ResetTokenPayload
 import secrets
 from models.otp_code import OtpCode, OtpPurpose
+from models.device import Device
 
 load_dotenv()
 
@@ -307,3 +308,26 @@ def decode_reset_token(token: str) -> ResetTokenPayload:
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Reset session expired. Please request a new code.",
         ) from exc
+
+
+def get_owned_device(device_id: str, user_id: int | None, session) -> Device:
+    """
+    Fetch a device by device_id, verifying it belongs to the given user.
+    Raises 404 if not found or not owned by the user.
+    """
+    if user_id is None:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="User ID is missing from the database record.")
+
+    device = session.exec(
+        select(Device)
+        .where(Device.device_id == device_id)
+        .where(Device.user_id == user_id)
+        .where(Device.is_enabled == True)  # noqa: E712
+    ).first()
+
+    if not device:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Device '{device_id}' not found",
+        )
+    return device

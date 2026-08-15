@@ -70,7 +70,7 @@ export default function DeviceSettingsScreen() {
                     </Text>
 
                     <VStack className="gap-2">
-                        <Text className="text-[13px] font-semibold text-foreground">New WiFi network</Text>
+                        <Text className="text-[13px] font-semibold text-foreground">New WiFi Network Name</Text>
                         <TextInput
                             value={wifiSsid}
                             onChangeText={setWifiSsid}
@@ -83,7 +83,7 @@ export default function DeviceSettingsScreen() {
                     </VStack>
 
                     <VStack className="gap-2">
-                        <Text className="text-[13px] font-semibold text-foreground">New WiFi password</Text>
+                        <Text className="text-[13px] font-semibold text-foreground">New WiFi Password</Text>
                         <TextInput
                             value={wifiPassword}
                             onChangeText={setWifiPassword}

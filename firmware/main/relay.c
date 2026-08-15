@@ -101,12 +101,23 @@ void relay_set_and_publish(esp_mqtt_client_handle_t client, bool state, const ch
     relay_save_state(state);
 
     cJSON *root = cJSON_CreateObject();
+    if (!root)
+    {
+        ESP_LOGE(TAG, "Failed to create JSON object — relay state not published");
+        return;
+    }
 
     cJSON_AddStringToObject(root, "state", state ? "ON" : "OFF");
     cJSON_AddStringToObject(root, "source", source);
     cJSON_AddNumberToObject(root, "ts", (double)sntp_get_epoch());
 
     char *payload = cJSON_PrintUnformatted(root);
+    if (!payload)
+    {
+        ESP_LOGE(TAG, "Failed to serialise relay state JSON");
+        cJSON_Delete(root);
+        return;
+    }
 
     esp_mqtt_client_publish(client, mqtt_topic_pub_relay_state(),
                             payload, 0, 1, 1);

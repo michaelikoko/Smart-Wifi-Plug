@@ -6,7 +6,7 @@ from sqlmodel import SQLModel
 
 
 class EnergyEventResponse(SQLModel):
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(from_attributes=True)  # type: ignore[assignment]
 
     id: int
     device_id: str
@@ -25,3 +25,7 @@ class EventListResponse(SQLModel):
     limit: int
     offset: int
     events: list[EnergyEventResponse]
+
+class MarkAllReadResponse(SQLModel):
+    """Response schema for the bulk mark-all-read endpoint."""
+    marked_read: int

@@ -2,20 +2,22 @@ from fastapi import APIRouter, HTTPException, status
 from sqlmodel import select
 
 from db.session import SessionDep
-from auth.dependencies import CurrentActiveUser
-from models.device import Device
+from auth.dependencies import CurrentActiveUser, get_owned_device
 from models.device_timer import DeviceTimer
 from schemas.device import DeviceResponse
 from schemas.timer import TimerCreate, TimerUpdate, TimerResponse
 from mqtt.handlers import _publish_timer_lock
-from routes.devices import _get_owned_device
 
 router = APIRouter(prefix="/devices/{device_id}/timers", tags=["timers"])
 
 
 @router.post("", response_model=TimerResponse, status_code=status.HTTP_201_CREATED, summary="Create a timer for a device")
 def create_timer(device_id: str, body: TimerCreate, session: SessionDep, current_user: CurrentActiveUser):
-    device = _get_owned_device(device_id, current_user.id, session)
+    """
+    Creates a new timer for the specified device. The device must be owned by the authenticated user. The timer will be created with the provided schedule and settings.
+    """
+    device = get_owned_device(device_id, current_user.id, session)
+
     timer = DeviceTimer(device_id=device.device_id, **body.model_dump())
     session.add(timer)
     session.commit()
@@ -25,7 +27,11 @@ def create_timer(device_id: str, body: TimerCreate, session: SessionDep, current
 
 @router.get("", response_model=list[TimerResponse], summary="List all timers for a device")
 def list_timers(device_id: str, session: SessionDep, current_user: CurrentActiveUser):
-    device = _get_owned_device(device_id, current_user.id, session)
+    """
+    Lists all timers for the specified device. The device must be owned by the authenticated user.
+    """
+    device = get_owned_device(device_id, current_user.id, session)
+
     return session.exec(
         select(DeviceTimer).where(DeviceTimer.device_id == device.device_id)
     ).all()
@@ -33,7 +39,11 @@ def list_timers(device_id: str, session: SessionDep, current_user: CurrentActive
 
 @router.patch("/{timer_id}", response_model=TimerResponse, summary="Update a timer")
 def update_timer(device_id: str, timer_id: int, body: TimerUpdate, session: SessionDep, current_user: CurrentActiveUser):
-    device = _get_owned_device(device_id, current_user.id, session)
+    """
+    Updates an existing timer for the specified device. The device must be owned by the authenticated user.
+    """
+    device = get_owned_device(device_id, current_user.id, session)
+
     timer = session.exec(
         select(DeviceTimer)
         .where(DeviceTimer.id == timer_id)
@@ -59,7 +69,10 @@ def update_timer(device_id: str, timer_id: int, body: TimerUpdate, session: Sess
 
 @router.delete("/{timer_id}", status_code=status.HTTP_204_NO_CONTENT, summary="Delete a timer")
 def delete_timer(device_id: str, timer_id: int, session: SessionDep, current_user: CurrentActiveUser):
-    device = _get_owned_device(device_id, current_user.id, session)
+    """
+    Deletes an existing timer for the specified device. The device must be owned by the authenticated user.
+    """
+    device = get_owned_device(device_id, current_user.id, session)
     timer = session.exec(
         select(DeviceTimer)
         .where(DeviceTimer.id == timer_id)
@@ -79,7 +92,7 @@ def rearm_timer_lock(device_id: str, session: SessionDep, current_user: CurrentA
     modify any timers. The next time any enabled timer's trigger time
     arrives, it will fire and re-lock normally.
     """
-    device = _get_owned_device(device_id, current_user.id, session)
+    device = get_owned_device(device_id, current_user.id, session)
 
     device.timer_lock_reason = None
     device.timer_locked_at = None

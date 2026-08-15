@@ -8,6 +8,8 @@
 #include "esp_log.h"
 #include "cJSON.h"
 #include "sntp.h"
+#include "esp_crt_bundle.h"
+
 static const char *TAG = "MQTT";
 
 esp_mqtt_client_handle_t mqtt_client = NULL;
@@ -181,6 +183,10 @@ void mqtt_app_start(void)
 
     esp_mqtt_client_config_t cfg = {
         .broker.address.uri = MQTT_BROKER_URI,
+        .broker.verification.crt_bundle_attach = esp_crt_bundle_attach,
+        .credentials.username = MQTT_USERNAME,
+        .credentials.authentication.password = MQTT_PASSWORD,
+        .session.keepalive = 30,
         .session.last_will.topic = mqtt_topic_pub_device_status(),
         .session.last_will.msg = "{\"status\":\"offline\"}",
         .session.last_will.msg_len = 0,

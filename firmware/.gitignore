@@ -19,3 +19,6 @@ __pycache__/
 # Testing and Logs (If you use pytest-embedded)
 .pytest_cache/
 pytest_embedded_log/
+
+# MQTT credentials
+main/mqtt_secrets.h

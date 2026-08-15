@@ -228,7 +228,6 @@ export default function HomeScreen() {
     await queryClient.invalidateQueries({
       predicate: (q) => ['me', 'devices'].includes(q.queryKey[0] as string),
     });
-    await Promise.all([refetchMe(), refetchDevices()]);
   };
 
   // Logout

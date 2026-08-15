@@ -13,7 +13,8 @@
 #define RELAY_PIN 3
 
 // MQTT
-#define MQTT_BROKER_URI     "mqtt://broker.hivemq.com:1883"
+#define MQTT_BROKER_URI     "mqtts://53f627ab53774f0b9e7157bfe6b5490c.s1.eu.hivemq.cloud:8883"
+#include "mqtt_secrets.h"   // defines MQTT_USERNAME / MQTT_PASSWORD 
 
 // Telemetry
 #define TELEMETRY_INTERVAL_MS 10000 // 10s for testing, 30000 for production

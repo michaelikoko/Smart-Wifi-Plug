@@ -6,7 +6,7 @@ from sqlmodel import select, func, col
 from auth.dependencies import CurrentActiveUser
 from db.session import SessionDep
 from models.energy_event import EnergyEvent
-from schemas.events import EnergyEventResponse, EventListResponse
+from schemas.events import EnergyEventResponse, EventListResponse, MarkAllReadResponse
 
 router = APIRouter(prefix="/events", tags=["events"])
 
@@ -44,7 +44,7 @@ def list_events(
     )
 
 
-@router.patch("/read-all")
+@router.patch("/read-all", response_model=MarkAllReadResponse)
 def mark_all_events_read(
     session: SessionDep,
     current_user: CurrentActiveUser,
@@ -58,7 +58,7 @@ def mark_all_events_read(
         .values(is_read=True)
     )
     session.commit()
-    return {"marked_read": result.rowcount}
+    return MarkAllReadResponse(marked_read=result.rowcount)
 
 
 @router.patch("/{event_id}/read", response_model=EnergyEventResponse)

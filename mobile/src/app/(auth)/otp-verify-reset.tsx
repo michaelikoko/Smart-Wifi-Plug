@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { ScrollView, View } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import { ArrowRight, ChevronLeft, LockKeyhole } from 'lucide-react-native';
+import { ArrowRight, LockKeyhole } from 'lucide-react-native';
 import { useMutation } from '@tanstack/react-query';
 import axios from 'axios';
 
@@ -12,7 +12,6 @@ import { Heading } from '@/components/ui/heading';
 import { Text } from '@/components/ui/text';
 import { Button, ButtonText, ButtonIcon, ButtonSpinner } from '@/components/ui/button';
 import { Link, LinkText } from '@/components/ui/link';
-import { Pressable } from '@/components/ui/pressable';
 
 import { OtpInput } from '@/components/app-ui';
 import { AppAlert } from '@/components/app-alert';
@@ -161,7 +160,7 @@ export default function OtpVerifyScreen() {
                 )}
 
                 <HStack className="items-center justify-center gap-1">
-                  <Text className="text-sm text-muted-foreground">Didn't receive code?</Text>
+                  <Text className="text-sm text-muted-foreground">Didn&apos;t receive code?</Text>
                   {resendMutation.isPending ? (
                     <Spinner />
                   ) : (

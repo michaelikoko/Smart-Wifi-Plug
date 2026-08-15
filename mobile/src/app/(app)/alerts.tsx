@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { FlatList, Pressable, RefreshControl, View } from 'react-native';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Bell, CheckCheck } from 'lucide-react-native';
+import { Bell, CheckCheck, RefreshCcw, WifiOff } from 'lucide-react-native';
 
 import { Text } from '@/components/ui/text';
 import { Heading } from '@/components/ui/heading';
@@ -64,9 +64,9 @@ export default function AlertsScreen() {
   const queryClient = useQueryClient();
   const [showUnreadOnly, setShowUnreadOnly] = useState(false);
 
-  const { data: eventList, isLoading, isRefetching } = useQuery({
+  const { data: eventList, isLoading, isRefetching, isError, refetch } = useQuery({
     queryKey: ['events'],
-    queryFn: () => listEvents(),
+    queryFn: () => listEvents()
   });
 
   const events = eventList?.events ?? [];
@@ -90,8 +90,7 @@ export default function AlertsScreen() {
   });
 
   const onRefresh = async () => {
-    //await queryClient.invalidateQueries({ queryKey: ['events'] });
-      await queryClient.refetchQueries({ queryKey: ['events'] });
+    await queryClient.refetchQueries({ queryKey: ['events'] });
   };
 
   return (
@@ -163,58 +162,85 @@ export default function AlertsScreen() {
           </HStack>
         </Card>
 
-        <FlatList
-          data={displayedEvents}
-          keyExtractor={(item) => String(item.id)}
-          className="flex-1"
-          showsVerticalScrollIndicator={false}
-          refreshing={isRefetching}
-          onRefresh={onRefresh}
-          refreshControl={
-            <RefreshControl
-              refreshing={isRefetching}
-              onRefresh={onRefresh}
-              tintColor="#171717"
-              colors={['#171717']}
-              progressBackgroundColor="#ffffff"
-            />
-          }
-          contentContainerClassName="gap-3 pb-8"
-          ListEmptyComponent={(
-            <Card size="sm" className="w-full items-center rounded-2xl py-10">
-              <VStack className="items-center gap-3">
-                {isInitialLoading ? (
-                  <Spinner size="large" />
-                ) : (
-                  <View className="h-16 w-16 items-center justify-center rounded-2xl bg-secondary">
-                    <Bell size={28} color="#737373" />
-                  </View>
-                )}
-                <VStack className="items-center gap-1.5">
-                  <Heading size="md" className="text-center text-foreground">
-                    {isInitialLoading ? 'Loading alerts' : 'No alerts'}
-                  </Heading>
-                  {!isInitialLoading ? (
-                    <Text className="max-w-64 text-center text-sm text-muted-foreground">
-                      When a device crosses its energy limit, it will appear here.
-                    </Text>
-                  ) : null}
-                </VStack>
+        {isError && !eventList ? (
+          <Card size="default" className="w-full items-center rounded-2xl py-10">
+            <VStack className="items-center gap-4">
+              <View className="h-16 w-16 items-center justify-center rounded-2xl bg-destructive/10">
+                <WifiOff size={28} color="#ef4444" />
+              </View>
+              <VStack className="items-center gap-2">
+                <Heading size="md" className="text-center text-foreground">
+                  Connection Error
+                </Heading>
+                <Text className="text-center text-sm text-muted-foreground px-4">
+                  Unable to load your alerts. Please check your internet and try again.
+                </Text>
               </VStack>
-            </Card>
-          )}
-          renderItem={({ item }) => (
-            <EventRow
-              event={item}
-              disabled={markReadMutation.isPending}
-              onPress={() => {
-                if (!item.is_read) {
-                  markReadMutation.mutate(item.id);
-                }
-              }}
-            />
-          )}
-        />
+              <Pressable
+                onPress={() => refetch()}
+                className="mt-2 flex-row items-center gap-2 rounded-xl bg-secondary px-5 py-3 active:opacity-70"
+              >
+                <RefreshCcw size={16} color="#171717" />
+                <Text className="text-[13px] font-bold uppercase tracking-widest text-foreground">
+                  Retry
+                </Text>
+              </Pressable>
+            </VStack>
+          </Card>
+        ) : (
+          <FlatList
+            data={displayedEvents}
+            keyExtractor={(item) => String(item.id)}
+            className="flex-1"
+            showsVerticalScrollIndicator={false}
+            refreshing={isRefetching}
+            onRefresh={onRefresh}
+            refreshControl={
+              <RefreshControl
+                refreshing={isRefetching}
+                onRefresh={onRefresh}
+                tintColor="#171717"
+                colors={['#171717']}
+                progressBackgroundColor="#ffffff"
+              />
+            }
+            contentContainerClassName="gap-3 pb-8"
+            ListEmptyComponent={(
+              <Card size="sm" className="w-full items-center rounded-2xl py-10">
+                <VStack className="items-center gap-3">
+                  {isInitialLoading ? (
+                    <Spinner size="large" />
+                  ) : (
+                    <View className="h-16 w-16 items-center justify-center rounded-2xl bg-secondary">
+                      <Bell size={28} color="#737373" />
+                    </View>
+                  )}
+                  <VStack className="items-center gap-1.5">
+                    <Heading size="md" className="text-center text-foreground">
+                      {isInitialLoading ? 'Loading alerts' : 'No alerts'}
+                    </Heading>
+                    {!isInitialLoading ? (
+                      <Text className="max-w-64 text-center text-sm text-muted-foreground">
+                        When a device crosses its energy limit, it will appear here.
+                      </Text>
+                    ) : null}
+                  </VStack>
+                </VStack>
+              </Card>
+            )}
+            renderItem={({ item }) => (
+              <EventRow
+                event={item}
+                disabled={markReadMutation.isPending}
+                onPress={() => {
+                  if (!item.is_read) {
+                    markReadMutation.mutate(item.id);
+                  }
+                }}
+              />
+            )}
+          />
+        )}
       </View>
     </View>
   );

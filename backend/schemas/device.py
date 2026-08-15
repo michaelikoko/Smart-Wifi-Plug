@@ -8,6 +8,9 @@ class DeviceRegisterRequest(BaseModel):
     device_id: str   
     name:      str   
 
+class UpdateDeviceRequest(BaseModel):
+    """Request schema for updating a device's name."""
+    name: str
 
 class DeviceResponse(BaseModel):
     """Response schema for device information."""

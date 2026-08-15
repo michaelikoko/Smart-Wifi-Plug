@@ -137,7 +137,6 @@ export default function DeviceOverviewScreen() {
                 ['energy-today', 'energy-history', 'energy-monthly'].includes(q.queryKey[0] as string) &&
                 q.queryKey[1] === device_id,
         });
-        await Promise.all([refetchHistory()]);
     };
 
     const relayMutation = useMutation({

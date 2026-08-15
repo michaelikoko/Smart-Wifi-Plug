@@ -5,7 +5,7 @@ import logging
 from datetime import datetime, timezone, date as date_type
 from zoneinfo import ZoneInfo
 from schemas.telemetry import TelemetryPayload, CurrentEnergyResponse, MonthlyEnergyConsumedResponse
-from db.session import SessionDep, get_session, engine
+from db.session import SessionDep, engine
 from models.telemetry import TelemetryReading, DeviceDailySummary
 from sqlmodel import select, Session, col
 from energy_limits.enforcement import check_limits_and_get_cutoff_reason
@@ -15,6 +15,7 @@ import json
 from models.device import Device
 import re
 import asyncio
+import os
 
 logging.basicConfig(
     level=logging.INFO,
@@ -24,8 +25,12 @@ logging.basicConfig(
 logger = logging.getLogger("mqtt")
 
 mqtt_config = MQTTConfig(
-    host="broker.hivemq.com",
-    port=1883,
+    host=os.environ["MQTT_HOST"],
+    port=int(os.getenv("MQTT_PORT", "8883")),
+    ssl=True,
+    keepalive = 30,
+    username=os.environ["MQTT_USERNAME"],
+    password=os.environ["MQTT_PASSWORD"],
 )
 fast_mqtt = FastMQTT(config=mqtt_config)
 
@@ -486,9 +491,6 @@ def register_mqtt_handlers():
                 ).first()
                 if device:
                     device.relay_state = state == "ON"
-                    #if state == "ON":
-                    #    device.cutoff_reason = None # Clear cutoff reason 
-                    #    device.cutoff_at = None
                     device.is_online = (
                         True  # Device is online if we're receiving relay state updates
                     )

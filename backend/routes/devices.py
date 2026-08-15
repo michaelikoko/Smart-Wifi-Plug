@@ -2,9 +2,9 @@ from fastapi import APIRouter, HTTPException, status
 from sqlmodel import select
 
 from db.session import SessionDep
-from auth.dependencies import CurrentActiveUser
+from auth.dependencies import CurrentActiveUser, get_owned_device
 from models.device import Device
-from schemas.device import DeviceRegisterRequest, DeviceResponse, UpdateDeviceLimitsRequest
+from schemas.device import DeviceRegisterRequest, DeviceResponse, UpdateDeviceLimitsRequest, UpdateDeviceRequest
 
 router = APIRouter(prefix="/devices", tags=["Devices"])
 
@@ -25,6 +25,7 @@ def register_device(
     device = session.exec(
         select(Device).where(Device.device_id == body.device_id)
     ).first()
+
     if not device:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -80,10 +81,7 @@ def get_device(
     """
     Get a single device by device_id.
     """
-    if current_user.id is None:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="User ID is missing from the database record.")
-
-    device = _get_owned_device(device_id, current_user.id, session)
+    device = get_owned_device(device_id, current_user.id, session)
     return device
 
 
@@ -94,17 +92,15 @@ def get_device(
 )
 def update_device(
     device_id: str,
-    body: DeviceRegisterRequest,
+    body: UpdateDeviceRequest,
     session: SessionDep,
     current_user: CurrentActiveUser,
 ):
     """
     Update device name.
     """
-    if current_user.id is None:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="User ID is missing from the database record.")
+    device = get_owned_device(device_id, current_user.id, session)
 
-    device = _get_owned_device(device_id, current_user.id, session)
     device.name = body.name
     session.add(device)
     session.commit()
@@ -123,20 +119,23 @@ def update_device_limits(
     session: SessionDep,
     current_user: CurrentActiveUser,
 ):
-    if current_user.id is None:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="User ID is missing from the database record.")
-    device = _get_owned_device(device_id, current_user.id, session)
+    device = get_owned_device(device_id, current_user.id, session)
 
-    if body.daily_limit_kwh is not None:
-        device.daily_limit_kwh = body.daily_limit_kwh
-    if body.monthly_limit_kwh is not None:
-        device.monthly_limit_kwh = body.monthly_limit_kwh
+    # Clear any previous cutoff only if a limit was actually part of this request —
+    # toggling auto_cutoff_enabled alone, or a no-op call, should not silently
+    # re-arm a device that's currently cut off.
+    if body.daily_limit_kwh is not None or body.monthly_limit_kwh is not None:
+        if body.daily_limit_kwh is not None:
+            device.daily_limit_kwh = body.daily_limit_kwh
+        if body.monthly_limit_kwh is not None:
+            device.monthly_limit_kwh = body.monthly_limit_kwh
+
+        # If the device is being re-enabled, clear any previous cutoff reason and timestamp
+        device.cutoff_reason = None
+        device.cutoff_at = None
+
     if body.auto_cutoff_enabled is not None:
         device.auto_cutoff_enabled = body.auto_cutoff_enabled
-
-    # If the device is being re-enabled, clear any previous cutoff reason and timestamp
-    device.cutoff_reason = None
-    device.cutoff_at = None
 
     session.add(device)
     session.commit()
@@ -157,32 +156,11 @@ def delete_device(
     """
     Unregister a device by marking it as disabled.
     """
-    if current_user.id is None:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="User ID is missing from the database record.")
+    device = get_owned_device(device_id, current_user.id, session)
 
-    device = _get_owned_device(device_id, current_user.id, session)
     # Soft delete — mark inactive rather than removing the row
     # Preserves telemetry history linked to this device_id
     device.user_id = None  # Unassign from user
     device.is_enabled = False
     session.add(device)
     session.commit()
-
-
-def _get_owned_device(device_id: str, user_id: int, session) -> Device:
-    """
-    Fetch a device by device_id, verifying it belongs to the given user.
-    Raises 404 if not found or not owned by the user.
-    """
-    device = session.exec(
-        select(Device)
-        .where(Device.device_id == device_id)
-        .where(Device.user_id == user_id)
-        .where(Device.is_enabled == True)  # noqa: E712
-    ).first()
-    if not device:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Device '{device_id}' not found",
-        )
-    return device

@@ -43,7 +43,7 @@ const POLL_INTERVAL_MS = 3000;
 const POLL_TIMEOUT_MS = 60_000;
 
 const wifiSetupSchema = z.object({
-  ssid: z.string().trim().min(1, 'Home WiFi SSID is required'),
+  ssid: z.string().trim().min(1, 'WiFi network name is required'),
   password: z.string().min(1, 'WiFi password is required'),
 });
 
@@ -234,7 +234,7 @@ export default function WifiSetupScreen() {
                 <FormControl isInvalid={!!errors.ssid} isRequired>
                   <FormControlLabel>
                     <FormControlLabelText className="text-[11px] font-bold uppercase tracking-widest">
-                      Home WiFi SSID
+                      WiFi Network Name (SSID)
                     </FormControlLabelText>
                   </FormControlLabel>
                   <Input className="rounded-xl">

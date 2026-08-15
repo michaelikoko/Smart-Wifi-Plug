@@ -17,11 +17,12 @@ function getClient(): Promise<MqttClient> {
   if (connectPromise) return connectPromise;
 
   connectPromise = new Promise((resolve, reject) => {
-//    const c = mqtt.connect(MQTT_WS_URL, {
     const c = mqtt.connect({
-      protocol: 'ws',
-      hostname: 'broker.hivemq.com',
-      port: 8000,
+      protocol: 'wss',
+      hostname: '53f627ab53774f0b9e7157bfe6b5490c.s1.eu.hivemq.cloud',
+      port: 8884,
+      username: process.env.EXPO_PUBLIC_MQTT_USERNAME,
+      password: process.env.EXPO_PUBLIC_MQTT_PASSWORD,
       clientId: `smartplug-${Math.random().toString(16).slice(2, 10)}`,
       path: '/mqtt',
       clean: true,
@@ -98,15 +99,15 @@ function _handleMessage(topic: string, payloadBuffer: Buffer) {
   if (subtopic === 'telemetry') {
     // Firmware payload: { v, i, p, e, f, pf, relay(0|1), ts, rssi }
     const telemetry: LiveTelemetry = {
-      voltage:   data.v as number,
-      current:   data.i as number,
-      power:     data.p as number,
-      energy:    data.e as number,
+      voltage: data.v as number,
+      current: data.i as number,
+      power: data.p as number,
+      energy: data.e as number,
       frequency: data.f as number,
-      pf:        data.pf as number,
-      relay:     (data.relay as number) === 1,
-      rssi:      data.rssi as number,
-      ts:        data.ts as number,
+      pf: data.pf as number,
+      relay: (data.relay as number) === 1,
+      rssi: data.rssi as number,
+      ts: data.ts as number,
       receivedAt: Date.now(),
     };
     setTelemetry(deviceId, telemetry);
@@ -116,9 +117,9 @@ function _handleMessage(topic: string, payloadBuffer: Buffer) {
   if (subtopic === 'relay/state') {
     // Firmware payload: { state: "ON"|"OFF", source: "app"|"button"|"boot", ts }
     const relayState: LiveRelayState = {
-      state:     data.state as 'ON' | 'OFF',
-      source:    data.source as string,
-      ts:        data.ts as number,
+      state: data.state as 'ON' | 'OFF',
+      source: data.source as string,
+      ts: data.ts as number,
       receivedAt: Date.now(),
     };
     setRelayState(deviceId, relayState);
