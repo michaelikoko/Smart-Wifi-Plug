@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ScrollView, View } from 'react-native';
+import { View } from 'react-native';
 import { useRouter } from 'expo-router';
 import {
   ArrowRight, ChevronLeft, Eye, EyeOff, Lock, Mail, UserRound, AlertCircle,
@@ -30,6 +30,8 @@ import axios from 'axios';
 import { useMutation } from '@tanstack/react-query';
 import { AppAlert } from '@/components/app-alert';
 import { AuthBackground } from '@/components/auth-background';
+import { FormScreen } from '@/components/app-ui';
+import { useEmailVerificationStore } from '../../store/email-verification-store';
 
 export const registerSchema = z
   .object({
@@ -67,6 +69,7 @@ export type RegisterFormData = z.infer<typeof registerSchema>;
 
 export default function RegisterScreen() {
   const router = useRouter();
+  const setVerificationEmail = useEmailVerificationStore((s) => s.setEmail);
 
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -97,12 +100,12 @@ export default function RegisterScreen() {
     mutationFn: registerUser,
     onSuccess: (data) => {
       console.log('Registration successful:', data);
-      setAlert({
-        title: "Account Created",
-        description: `Your account with email ${data.email} has been created successfully. Please proceed to Login`,
-        action: 'success',
-      });
       reset();
+      setVerificationEmail(data.email);
+      router.push({
+        pathname: '/(auth)/otp-verify-email',
+        params: { email: data.email },
+      });
     },
     onError: (error) => {
       const message = {
@@ -143,7 +146,7 @@ export default function RegisterScreen() {
   return (
     <AuthBackground>
       <View className="flex-1">
-        <ScrollView
+        <FormScreen
           showsVerticalScrollIndicator={false}
           contentContainerClassName="flex-grow justify-center px-5"
         >
@@ -354,7 +357,7 @@ export default function RegisterScreen() {
               </VStack>
             </Card>
           </VStack>
-        </ScrollView>
+        </FormScreen>
 
       </View>
     </AuthBackground>

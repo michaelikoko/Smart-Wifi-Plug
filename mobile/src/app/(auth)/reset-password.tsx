@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ScrollView, View } from 'react-native';
+import { View } from 'react-native';
 import { useRouter } from 'expo-router';
 import {
   AlertCircle, ChevronLeft, Eye, EyeOff, KeyRound, Lock,
@@ -31,6 +31,7 @@ import { resetPassword } from '../../api/auth-api';
 import { usePasswordResetStore } from '../../store/password-reset-store';
 import { Link } from '@/components/ui/link';
 import { AuthBackground } from '@/components/auth-background';
+import { FormScreen } from '@/components/app-ui';
 
 export const resetPasswordSchema = z
   .object({
@@ -136,7 +137,7 @@ export default function ResetPasswordScreen() {
   return (
     <AuthBackground>
       <View className="flex-1">
-        <ScrollView
+        <FormScreen
           showsVerticalScrollIndicator={false}
           contentContainerClassName="flex-grow justify-center px-5"
         >
@@ -249,7 +250,7 @@ export default function ResetPasswordScreen() {
               </VStack>
             </Card>
           </VStack>
-        </ScrollView>
+        </FormScreen>
       </View>
     </AuthBackground>
   );

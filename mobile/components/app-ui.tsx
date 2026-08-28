@@ -6,6 +6,8 @@ import { Pressable, TextInput, View, useWindowDimensions, ScrollView } from 'rea
 import { ChevronLeft, ChevronRight } from 'lucide-react-native';
 import { BarChart } from 'react-native-gifted-charts';
 import { Spinner } from './ui/spinner';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
+import type { ScrollViewProps } from 'react-native';
 
 export type AlertState = {
   title: string;
@@ -389,5 +391,23 @@ export function RelayRow({
         )}
       </Wrapper>
     </HStack>
+  );
+}
+
+
+export function FormScreen({
+  children,
+  contentContainerClassName,
+  ...rest
+}: ScrollViewProps & { children: React.ReactNode }) {
+  return (
+    <KeyboardAwareScrollView
+      bottomOffset={20}
+      showsVerticalScrollIndicator={false}
+      contentContainerClassName={contentContainerClassName}
+      {...rest}
+    >
+      {children}
+    </KeyboardAwareScrollView>
   );
 }

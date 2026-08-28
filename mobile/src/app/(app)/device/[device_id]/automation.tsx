@@ -4,12 +4,13 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLocalSearchParams } from 'expo-router';
 import { Pencil, ToggleLeft, ToggleRight, Trash2 } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
-import { Alert, Pressable, ScrollView, TextInput } from 'react-native';
+import { Alert, Pressable, TextInput } from 'react-native';
 
 import { Card } from '@/components/ui/card';
 import { HStack } from '@/components/ui/hstack';
 import { Text } from '@/components/ui/text';
 import { VStack } from '@/components/ui/vstack';
+import { FormScreen } from '@/components/app-ui';
 
 import { listDevices, updateDeviceLimits } from '../../../../api/devices-api';
 import { createTimer, deleteTimer, listTimers, updateTimer, type TimerResponse } from '../../../../api/timers-api';
@@ -175,7 +176,7 @@ export default function DeviceAutomationScreen() {
     }, [saveSuccess]);
 
     return (
-        <ScrollView
+        <FormScreen
             showsVerticalScrollIndicator={false}
             contentContainerClassName="px-4 py-5 gap-4 pb-8"
         >
@@ -404,6 +405,6 @@ export default function DeviceAutomationScreen() {
                     )}
                 </VStack>
             </Card>
-        </ScrollView>
+        </FormScreen>
     );
 }

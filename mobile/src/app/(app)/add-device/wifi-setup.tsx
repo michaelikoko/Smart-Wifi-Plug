@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ScrollView, View } from 'react-native';
+import { View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import {
   AlertCircle,
@@ -35,6 +35,7 @@ import {
 } from '@/components/ui/form-control';
 import { Input, InputField, InputIcon, InputSlot } from '@/components/ui/input';
 import { Spinner } from '@/components/ui/spinner';
+import { FormScreen } from '@/components/app-ui';
 
 import { getDevice } from '../../../api/devices-api';
 import { submitWifiCredentials } from '../../../api/provisioning-api';
@@ -444,35 +445,35 @@ export default function WifiSetupScreen() {
         </VStack>
       </Card>
     );
-};
+  };
 
-return (
-  <View className="flex-1 bg-secondary dark:bg-background">
-    <ScrollView
-      showsVerticalScrollIndicator={false}
-      contentContainerClassName="flex-grow justify-center px-5 py-6"
-    >
-      <VStack className="mx-auto w-full max-w-sm gap-5">
-        <HStack className="items-center justify-between px-1">
-          <VStack className="gap-0.5">
-            <Text className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground">
-              Add Device
-            </Text>
-            <Heading size="lg" className="text-foreground">
-              WiFi Setup
-            </Heading>
-          </VStack>
+  return (
+    <View className="flex-1 bg-secondary dark:bg-background">
+      <FormScreen
+        showsVerticalScrollIndicator={false}
+        contentContainerClassName="flex-grow justify-center px-5 py-6"
+      >
+        <VStack className="mx-auto w-full max-w-sm gap-5">
+          <HStack className="items-center justify-between px-1">
+            <VStack className="gap-0.5">
+              <Text className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground">
+                Add Device
+              </Text>
+              <Heading size="lg" className="text-foreground">
+                WiFi Setup
+              </Heading>
+            </VStack>
 
-          <View className="h-11 w-11 items-center justify-center rounded-2xl bg-card border border-border">
-            <PlugZap size={20} color="#737373" />
-          </View>
-        </HStack>
+            <View className="h-11 w-11 items-center justify-center rounded-2xl bg-card border border-border">
+              <PlugZap size={20} color="#737373" />
+            </View>
+          </HStack>
 
-        {renderContent()}
-      </VStack>
-    </ScrollView>
-  </View>
-);
+          {renderContent()}
+        </VStack>
+      </FormScreen>
+    </View>
+  );
 }
 
 /*

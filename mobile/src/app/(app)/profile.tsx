@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { View, ScrollView } from 'react-native';
+import { View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { LogOut, User, Pencil, Banknote, AlertCircle, Lock, Eye, EyeOff } from 'lucide-react-native';
 import { useMutation } from '@tanstack/react-query';
@@ -28,7 +28,7 @@ import { AppAlert } from '@/components/app-alert';
 import { useAuthStore } from '../../store/auth-store';
 import { logoutUser } from '../../api/auth-api';
 import { updateBillingRate, updateProfile, changePassword } from '../../api/users-api';
-import { useAlertState } from '@/components/app-ui';
+import { FormScreen, useAlertState } from '@/components/app-ui';
 
 const billingRateSchema = z.object({
   rate: z
@@ -197,7 +197,7 @@ export default function ProfileScreen() {
         <HStack className="items-start justify-between gap-4">
           <VStack className="flex-1 gap-1">
             <Heading size="lg" className="text-foreground">
-              Profiles
+              Profile
             </Heading>
             <Text className="text-[13px] text-muted-foreground">
               Manage your account and preferences.
@@ -206,7 +206,7 @@ export default function ProfileScreen() {
         </HStack>
       </View>
 
-      <ScrollView
+      <FormScreen
         showsVerticalScrollIndicator={false}
         contentContainerClassName="px-4 py-5 gap-4 pb-8"
       >
@@ -580,7 +580,7 @@ export default function ProfileScreen() {
             {logoutMutation.isPending ? <ButtonSpinner /> : <ButtonIcon as={LogOut} />}
           </Button>
         </Card>
-      </ScrollView>
+      </FormScreen>
     </View>
   );
 }

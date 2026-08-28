@@ -120,3 +120,28 @@ class ResetPasswordResponse(BaseModel):
     Reset password response schema.
     """
     message: str = "Password updated successfully"
+
+
+class VerifyEmailOtpRequest(BaseModel):
+    """
+    Verify registration OTP request schema.
+    """
+    email: EmailStr
+    otp: str
+
+
+class ResendVerificationOtpRequest(BaseModel):
+    """
+    Resend registration verification OTP request schema.
+    """
+    email: EmailStr
+
+
+class ResendVerificationOtpResponse(BaseModel):
+    """
+    Resend verification OTP response schema.
+    Same message regardless of whether the account exists or is already
+    verified — prevents account enumeration, same pattern as
+    ForgotPasswordResponse.
+    """
+    message: str = "If an account needs verification, a new code has been sent."

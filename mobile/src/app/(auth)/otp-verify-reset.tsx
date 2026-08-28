@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ScrollView, View } from 'react-native';
+import { View } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { ArrowRight, LockKeyhole } from 'lucide-react-native';
 import { useMutation } from '@tanstack/react-query';
@@ -13,7 +13,7 @@ import { Text } from '@/components/ui/text';
 import { Button, ButtonText, ButtonIcon, ButtonSpinner } from '@/components/ui/button';
 import { Link, LinkText } from '@/components/ui/link';
 
-import { OtpInput } from '@/components/app-ui';
+import { OtpInput, FormScreen } from '@/components/app-ui';
 import { AppAlert } from '@/components/app-alert';
 import { forgotPassword, verifyResetOtp } from '../../api/auth-api';
 import { usePasswordResetStore } from '../../store/password-reset-store';
@@ -119,7 +119,7 @@ export default function OtpVerifyScreen() {
   return (
     <AuthBackground>
       <View className="flex-1">
-        <ScrollView
+        <FormScreen
           showsVerticalScrollIndicator={false}
           contentContainerClassName="flex-grow justify-center px-5"
         >
@@ -194,7 +194,7 @@ export default function OtpVerifyScreen() {
               </VStack>
             </Card>
           </VStack>
-        </ScrollView>
+        </FormScreen>
       </View>
     </AuthBackground>
   );

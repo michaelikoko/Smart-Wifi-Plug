@@ -37,8 +37,8 @@ void sntp_init_and_sync(void)
 
     // Wait for sync — max 10 seconds
     int retries = 0;
-    while (!time_synced && retries < 20) {
-        ESP_LOGI(TAG, "Waiting for time sync... (%d/20)", retries + 1);
+    while (!time_synced && retries < 30) {
+        ESP_LOGI(TAG, "Waiting for time sync... (%d/30)", retries + 1);
         vTaskDelay(pdMS_TO_TICKS(500));
         retries++;
     }

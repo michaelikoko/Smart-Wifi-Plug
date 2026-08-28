@@ -1,9 +1,9 @@
 import { GluestackUIProvider } from '@/components/ui/gluestack-ui-provider';
-import { Stack, useRouter } from 'expo-router';
+import { Stack, useRouter, useSegments } from 'expo-router';
 import { useColorScheme } from 'react-native';
 import '@/src/global.css';
 import { QueryClientProvider } from '@tanstack/react-query';
-import { useSegments } from 'expo-router';
+import { KeyboardProvider } from 'react-native-keyboard-controller'
 import { useAuthStore } from '../store/auth-store';
 import { useEffect } from 'react';
 import { queryClient } from '../lib/query-client';
@@ -44,8 +44,10 @@ export default function RootLayout() {
   return (
     <QueryClientProvider client={queryClient}>
       <GluestackUIProvider mode={mode}>
-        <AuthGuard />
-        <Stack screenOptions={{ headerShown: false }} />
+        <KeyboardProvider>
+          <AuthGuard />
+          <Stack screenOptions={{ headerShown: false }} />
+        </KeyboardProvider>
       </GluestackUIProvider>
     </QueryClientProvider>
   );

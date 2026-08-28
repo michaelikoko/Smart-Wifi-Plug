@@ -1,11 +1,12 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Alert, Pressable, ScrollView, TextInput } from 'react-native';
+import { Alert, Pressable, TextInput } from 'react-native';
 
 import { Card } from '@/components/ui/card';
 import { Text } from '@/components/ui/text';
 import { VStack } from '@/components/ui/vstack';
+import { FormScreen } from '@/components/app-ui';
 
 import { deleteDevice } from '../../../../api/devices-api';
 import { publishWifiChangeCommand, unsubscribeFromDevice } from '../../../../lib/mqtt-client';
@@ -59,7 +60,7 @@ export default function DeviceSettingsScreen() {
     });
 
     return (
-        <ScrollView
+        <FormScreen
             showsVerticalScrollIndicator={false}
             contentContainerClassName="px-4 py-5 gap-4 pb-8"
         >
@@ -168,6 +169,6 @@ export default function DeviceSettingsScreen() {
                     ) : null}
                 </VStack>
             </Card>
-        </ScrollView>
+        </FormScreen>
     );
 }

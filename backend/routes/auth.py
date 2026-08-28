@@ -14,11 +14,15 @@ from schemas.auth import (
     VerifyResetOtpResponse,
     ResetPasswordRequest,
     ResetPasswordResponse,
+    VerifyEmailOtpRequest,
+    ResendVerificationOtpRequest,
+    ResendVerificationOtpResponse
 )
 from schemas.user import UserResponse
 from auth.dependencies import (
     get_password_hash,
     authenticate_user,
+    verify_password,
     create_access_token,
     create_refresh_token,
     get_refresh_token_expire_time,
@@ -37,6 +41,29 @@ from emails.email_service import send_otp_email
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
 
+def _build_token_response(user: User, session: SessionDep) -> TokenResponse:
+    """
+    Shared "issue access+refresh token pair, persist refresh token" logic,
+    used by both login() and verify_email_otp() (registration verification
+    logs the user straight in, same as a normal login).
+    """
+    if user.id is None:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="User ID is missing from the database record.",
+        )
+
+    access_token = create_access_token(user_id=user.id, email=user.email)
+    refresh_token = create_refresh_token(user_id=user.id, email=user.email)
+
+    refresh_token_record = RefreshToken(
+        token=refresh_token, user_id=user.id, expires_at=get_refresh_token_expire_time()
+    )
+    session.add(refresh_token_record)
+    session.commit()
+
+    return TokenResponse(access_token=access_token, refresh_token=refresh_token)
+
 
 @router.post(
     "/register",
@@ -47,6 +74,14 @@ router = APIRouter(prefix="/auth", tags=["Auth"])
 def register(body: RegisterRequest, session: SessionDep) -> User:
     """
     Register a new user account.
+    New accounts start inactive (is_active=False) and must verify their
+    email via OTP before they can log in.
+
+    If the email already belongs to an existing, unverified account, this
+    resumes registration instead of blocking with a 409 — updates the
+    account to the latest submitted name/password and issues a fresh OTP,
+    rather than permanently trapping someone who closed the app before
+    verifying. A 409 is only raised for an email that's already verified.
     """
     if body.password != body.confirm_password:
         raise HTTPException(
@@ -54,24 +89,88 @@ def register(body: RegisterRequest, session: SessionDep) -> User:
             detail="Passwords do not match",
         )
     existing = session.exec(select(User).where(User.email == body.email)).first()
-    if existing:
+
+    if existing is not None:
+        if existing.is_active:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="An account with this email already exists",
+            )
+        # Unverified account — resume registration with the latest details.
+        existing.password_hash = get_password_hash(body.password)
+        existing.full_name = body.full_name
+        session.add(existing)
+        session.commit()
+        session.refresh(existing)
+        user = existing
+    else:
+        password_hash = get_password_hash(body.password)
+        user = User(
+            email=body.email,
+            password_hash=password_hash,
+            full_name=body.full_name,
+            is_active=False,
+        )
+        session.add(user)
+        session.commit()
+        session.refresh(user)
+
+    if user.id is not None:
+        otp = issue_otp(session, user_id=user.id, purpose=OtpPurpose.EMAIL_VERIFICATION)
+        send_otp_email(to=user.email, otp=otp, purpose=OtpPurpose.EMAIL_VERIFICATION)
+
+    return user
+
+@router.post(
+    "/verify-email-otp",
+    response_model=TokenResponse,
+    summary="Verify a registration OTP and log in",
+)
+
+def verify_email_otp(body: VerifyEmailOtpRequest, session: SessionDep) -> TokenResponse:
+    """
+    Verifies a registration OTP and activates the account. On success,
+    logs the user straight in (same token pair shape as /login) — no
+    separate login step required after verifying.
+    """
+    user = session.exec(select(User).where(User.email == body.email)).first()
+
+    if user is None or user.id is None:
         raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="An account with this email already exists",
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired code",
         )
 
-    password_hash = get_password_hash(body.password)
-    user = User(
-        email=body.email,
-        password_hash=password_hash,
-        full_name=body.full_name,
-    )
+    verify_otp(session, user_id=user.id, purpose=OtpPurpose.EMAIL_VERIFICATION, code=body.otp)
+
+    user.is_active = True
     session.add(user)
     session.commit()
     session.refresh(user)
 
-    return user
+    return _build_token_response(user, session)
 
+
+@router.post(
+    "/resend-verification-otp",
+    response_model=ResendVerificationOtpResponse,
+    summary="Resend a registration verification OTP",
+)
+def resend_verification_otp(
+    body: ResendVerificationOtpRequest, session: SessionDep
+) -> ResendVerificationOtpResponse:
+    """
+    Always returns the same generic message, whether or not the email
+    exists or is already verified — prevents account enumeration, same
+    pattern as /forgot-password.
+    """
+    user = session.exec(select(User).where(User.email == body.email)).first()
+
+    if user is not None and user.id is not None and not user.is_active:
+        otp = issue_otp(session, user_id=user.id, purpose=OtpPurpose.EMAIL_VERIFICATION)
+        send_otp_email(to=user.email, otp=otp, purpose=OtpPurpose.EMAIL_VERIFICATION)
+
+    return ResendVerificationOtpResponse()
 
 @router.post(
     "/login",
@@ -85,20 +184,23 @@ def login(body: LoginRequest, session: SessionDep) -> TokenResponse:
     user = authenticate_user(body.email, body.password, session)
 
     if user is None or user.id is None:
+        candidate = session.exec(select(User).where(User.email == body.email)).first()
+
+        if (
+            candidate is not None
+            and candidate.id is not None
+            and not candidate.is_active
+            and verify_password(body.password, candidate.password_hash)
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Please verify your email before logging in.",
+            )
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect email or password",
         )
-    access_token = create_access_token(user_id=user.id, email=user.email)
-    refresh_token = create_refresh_token(user_id=user.id, email=user.email)
-
-    refresh_token_record = RefreshToken(
-        token=refresh_token, user_id=user.id, expires_at=get_refresh_token_expire_time()
-    )
-    session.add(refresh_token_record)
-    session.commit()
-    return TokenResponse(access_token=access_token, refresh_token=refresh_token)
-
+    return _build_token_response(user, session)
 
 @router.post(
     "/refresh",

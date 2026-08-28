@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ScrollView, View } from 'react-native';
+import { View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { AlertCircle, ArrowRight, ChevronLeft, Mail, Zap } from 'lucide-react-native';
 import { z } from 'zod';
@@ -10,7 +10,6 @@ import axios from 'axios';
 
 import { Card } from '@/components/ui/card';
 import { VStack } from '@/components/ui/vstack';
-import { HStack } from '@/components/ui/hstack';
 import { Heading } from '@/components/ui/heading';
 import { Text } from '@/components/ui/text';
 import { Button, ButtonText, ButtonIcon, ButtonSpinner } from '@/components/ui/button';
@@ -29,7 +28,7 @@ import { forgotPassword } from '../../api/auth-api';
 import { usePasswordResetStore } from '../../store/password-reset-store';
 import { Link } from '@/components/ui/link';
 import { AuthBackground } from '@/components/auth-background';
-
+import { FormScreen } from '@/components/app-ui';
 
 const forgotPasswordSchema = z.object({
   email: z.email('Enter a valid email address').toLowerCase(),
@@ -93,7 +92,7 @@ export default function ForgotPasswordScreen() {
   return (
     <AuthBackground>
       <View className="flex-1">
-        <ScrollView
+        <FormScreen
           showsVerticalScrollIndicator={false}
           contentContainerClassName="flex-grow justify-center px-5"
         >
@@ -184,7 +183,7 @@ export default function ForgotPasswordScreen() {
               </VStack>
             </Card>
           </VStack>
-        </ScrollView>
+        </FormScreen>
       </View>
     </AuthBackground>
   );

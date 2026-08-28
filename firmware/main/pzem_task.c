@@ -24,8 +24,7 @@ static int8_t get_rssi(void)
     }
     return 0;
 }
-/*
-Commented out to test without pzem
+
 static void publish_telemetry(void)
 {
     bool ok = updateValues(PZEM_ADDR);
@@ -64,8 +63,10 @@ static void publish_telemetry(void)
     ESP_LOGI(TAG, "Telemetry: %s", payload);
     free(payload);
 }
-*/
 
+
+/*
+// Simulated telemetry values for testing without PZEM
 static double sim_energy_wh = 0.0;
 
 static void publish_telemetry(void)
@@ -100,11 +101,12 @@ static void publish_telemetry(void)
     ESP_LOGI(TAG, "Telemetry (SIM): %s", payload);
     free(payload);
 }
+*/
 
 void pzem_task(void *pvParameters)
 {
-    //initialize_pzem(ESP_TX_TO_PZEM_RX_PIN, ESP_RX_FROM_PZEM_TX_PIN);
-    //ESP_LOGI(TAG, "PZEM initialized");
+    initialize_pzem(ESP_TX_TO_PZEM_RX_PIN, ESP_RX_FROM_PZEM_TX_PIN);
+    ESP_LOGI(TAG, "PZEM initialized");
 
     while (1) {
         vTaskDelay(pdMS_TO_TICKS(TELEMETRY_INTERVAL_MS));

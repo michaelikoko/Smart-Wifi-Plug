@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ScrollView, View } from 'react-native';
+import { View } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import {
   AlertCircle,
@@ -37,6 +37,8 @@ import { loginUser } from '../../api/auth-api';
 import axios from 'axios';
 import { usePasswordResetStore } from '../../store/password-reset-store';
 import { AuthBackground } from '@/components/auth-background';
+import { FormScreen } from '@/components/app-ui';
+import { useEmailVerificationStore } from '../../store/email-verification-store';
 
 export const loginSchema = z
   .object({
@@ -47,12 +49,12 @@ export const loginSchema = z
     password: z
       .string()
       .min(1, 'Password is required'),
-//      .min(8, 'Password must be at least 8 characters')
-//      .regex(/[0-9]/, 'Password must contain a number')
-//      .regex(
-//        /[^A-Za-z0-9]/,
-//        'Password must contain a special character'
-//      ),
+    //      .min(8, 'Password must be at least 8 characters')
+    //      .regex(/[0-9]/, 'Password must contain a number')
+    //      .regex(
+    //        /[^A-Za-z0-9]/,
+    //        'Password must contain a special character'
+    //      ),
   });
 
 export type LoginFormData = z.infer<typeof loginSchema>;
@@ -63,6 +65,9 @@ export default function LoginScreen() {
   const clearResetSession = usePasswordResetStore((s) => s.clear);
 
   const [showPassword, setShowPassword] = useState(false);
+  const [needsVerification, setNeedsVerification] = useState(false);
+  const setVerificationEmail = useEmailVerificationStore((s) => s.setEmail);
+  
   const [alert, setAlert] = useState<{
     title: string;
     description: string;
@@ -87,6 +92,7 @@ export default function LoginScreen() {
     handleSubmit,
     formState: { errors, isValid },
     reset,
+    watch
   } = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
     mode: 'onChange',
@@ -103,7 +109,7 @@ export default function LoginScreen() {
       reset();
       router.replace('/(app)/home');
     },
-    onError: (error) => {
+    onError: (error, variables) => {
       //console.error('Login failed:', error);
       const message = {
         title: "Login Failed",
@@ -119,6 +125,9 @@ export default function LoginScreen() {
         else if (status === 401) {
           message.title = "Unauthorized";
           message.description = "Invalid email or password.";
+        } else if (status === 403) {
+          message.title = "Email Not Verified";
+          message.description = "Please verify your email before logging in.";
         } else if (status === 500) {
           message.title = "Server Error";
           message.description = "Something went wrong on our end. Please try again later.";
@@ -130,6 +139,11 @@ export default function LoginScreen() {
         description: message.description,
         action: 'error',
       });
+
+      if (axios.isAxiosError(error) && error.response?.status === 403) {
+        setNeedsVerification(true);
+        setVerificationEmail(variables.email);
+      }
     }
   })
 
@@ -141,7 +155,7 @@ export default function LoginScreen() {
   return (
     <AuthBackground>
       <View className="flex-1">
-        <ScrollView
+        <FormScreen
           showsVerticalScrollIndicator={false}
           contentContainerClassName="flex-grow justify-center px-5"
         >
@@ -240,16 +254,33 @@ export default function LoginScreen() {
                   )}
                 />
 
-                {
-                  alert && (
-                    <AppAlert
-                      title={alert.title}
-                      description={alert.description}
-                      action={alert.action}
-                      onClose={() => setAlert(null)}
-                    />
-                  )
-                }
+                 {
+                   alert && (
+                     <AppAlert
+                       title={alert.title}
+                       description={alert.description}
+                       action={alert.action}
+                       onClose={() => setAlert(null)}
+                     />
+                   )
+                 }
+                {needsVerification ? (
+                  <HStack className="items-center justify-center gap-1">
+                    <Link
+                      onPress={() =>
+                        router.push({
+                          pathname: '/(auth)/otp-verify-email',
+                          params: { email: watch('email') },
+                        })
+                      }
+                    >
+                      <LinkText className="text-sm font-semibold">
+                        Verify your email now
+                      </LinkText>
+                    </Link>
+                  </HStack>
+                ) : null}
+
                 <HStack className="items-center justify-end gap-0.5">
                   <Link onPress={() => router.push('/(auth)/forgot-password')}>
                     <LinkText className="text-sm font-semibold">Forgot Password?</LinkText>
@@ -273,7 +304,7 @@ export default function LoginScreen() {
                 </Button>
 
                 <HStack className="items-center justify-center gap-1">
-                  <Text className="text-sm text-muted-foreground">Don't have an account?</Text>
+                  <Text className="text-sm text-muted-foreground">Don&apos;t have an account?</Text>
                   <Link onPress={() => router.push('/(auth)/register')}>
                     <LinkText className="text-sm font-semibold">Register</LinkText>
                   </Link>
@@ -282,7 +313,7 @@ export default function LoginScreen() {
               </VStack>
             </Card>
           </VStack>
-        </ScrollView>
+        </FormScreen>
       </View>
     </AuthBackground>
   );

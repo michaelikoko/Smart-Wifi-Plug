@@ -32,6 +32,10 @@ export interface ResetPasswordResponse {
   message: string;
 }
 
+export interface ResendVerificationOtpResponse {
+  message: string;
+}
+
 export const registerUser = async (data: RegisterFormData): Promise<UserResponse> => {
   const response = await apiClient.post<UserResponse>('/auth/register', {
     email: data.email,
@@ -129,6 +133,41 @@ export const resetPassword = async (data: {
       headers: { Authorization: `Bearer ${data.resetToken}` },
       _skipAuthRefresh: true,
     }
+  );
+  return response.data;
+};
+
+export const verifyEmailOtp = async (data: {
+  email: string;
+  otp: string;
+}): Promise<UserResponse> => {
+  /*
+  POST /auth/verify-email-otp
+  Returns a TokenResponse on success — verifying logs the user straight
+  in, mirrors loginUser()'s persist-tokens-then-fetch-/me flow rather
+  than requiring a separate login step afterward.
+  */
+  const tokenRes = await apiClient.post<TokenResponse>('/auth/verify-email-otp', data);
+  const { access_token, refresh_token } = tokenRes.data;
+
+  useAuthStore.getState().setTokens(access_token, refresh_token);
+
+  const meRes = await apiClient.get<UserResponse>('/auth/me');
+  useAuthStore.getState().setUser(meRes.data);
+
+  return meRes.data;
+};
+
+export const resendVerificationOtp = async (data: {
+  email: string;
+}): Promise<ResendVerificationOtpResponse> => {
+  /*
+  POST /auth/resend-verification-otp
+  always resolves 200, even for unknown or already-verified emails
+  */
+  const response = await apiClient.post<ResendVerificationOtpResponse>(
+    '/auth/resend-verification-otp',
+    data
   );
   return response.data;
 };

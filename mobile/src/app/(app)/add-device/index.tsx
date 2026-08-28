@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ScrollView, View } from 'react-native';
+import { View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { AlertCircle, ArrowRight, Plus, PlugZap, Wifi } from 'lucide-react-native';
 import { Controller, useForm } from 'react-hook-form';
@@ -24,6 +24,7 @@ import {
 } from '@/components/ui/form-control';
 import { Input, InputField, InputIcon, InputSlot } from '@/components/ui/input';
 import { AppAlert } from '@/components/app-alert';
+import { FormScreen } from '@/components/app-ui';
 
 import { registerDevice, type DeviceRegisterRequest } from '../../../api/devices-api';
 
@@ -103,7 +104,7 @@ export default function AddDeviceScreen() {
 
   return (
     <View className="flex-1 bg-secondary dark:bg-background">
-      <ScrollView
+      <FormScreen
         showsVerticalScrollIndicator={false}
         contentContainerClassName="flex-grow justify-center px-5 py-6"
       >
@@ -225,7 +226,7 @@ export default function AddDeviceScreen() {
             </VStack>
           </Card>
         </VStack>
-      </ScrollView>
+      </FormScreen>
     </View>
   );
 }
