@@ -3,6 +3,8 @@ import type { CurrentEnergyResponse, MonthlyEnergyResponse } from '../api/teleme
 import type { LiveRelayState, LiveTelemetry, LiveTimerLock } from '../store/device-state-store';
 import { useDeviceStateStore } from '../store/device-state-store';
 import { queryClient } from './query-client';
+import { AppState } from 'react-native';
+
 
 let client: MqttClient | null = null;
 let connectPromise: Promise<MqttClient> | null = null;
@@ -26,10 +28,10 @@ function getClient(): Promise<MqttClient> {
       clientId: `smartplug-${Math.random().toString(16).slice(2, 10)}`,
       path: '/mqtt',
       clean: true,
-      reconnectPeriod: 2000,
-      connectTimeout: 10000, // Slightly increased for public brokers
+      reconnectPeriod: 500,     // was 2000 — retry every 0.5s instead of 2s
+      connectTimeout: 5000,     // was 10000 — fail faster if a reconnect attempt stalls
+      keepalive: 15,            // matches your firmware's tightened keepalive; detects a dead link sooner
     });
-
     c.on('connect', () => {
       console.log('[mqtt] connected');
       client = c;
@@ -299,3 +301,10 @@ export function disconnectMqtt(): void {
   connectPromise = null;
   console.log('[mqtt] disconnected');
 }
+
+
+AppState.addEventListener('change', (state) => {
+  if (state === 'active' && !client?.connected) {
+    getClient().catch((err) => console.warn('[mqtt] foreground reconnect failed:', err));
+  }
+});

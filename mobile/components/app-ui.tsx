@@ -138,6 +138,7 @@ export function WeeklyBars({ data, title = 'Weekly Consumption' }: { data: Weekl
 
     return {
       ...d,
+      index: idx,
       label: d.label ?? `${d.day}\n${dayOfMonth}`,
       value: d.kwh,
       costFormatted: costValue > 0 ? `₦${costValue.toFixed(2)}` : '₦0.00',
@@ -187,16 +188,22 @@ export function WeeklyBars({ data, title = 'Weekly Consumption' }: { data: Weekl
               noOfSections={4}
               yAxisExtraHeight={50}
               disableScroll
-              renderTooltip={(item: any) => (
-                <View className="mb-2 items-center justify-center rounded-md bg-foreground px-2 py-1 shadow-lg">
-                  <Text className="text-[10px] font-bold text-background">
-                    {item.day} · {formatDate(item.date)} · {item.value.toFixed(2)} kWh
-                  </Text>
-                  <Text className="text-[9px] text-muted">
-                    {item.costFormatted}
-                  </Text>
-                </View>
-              )}
+              renderTooltip={(item: any) => {
+                const isNearEnd = item.index >= barData.length - 2; // last 2 bars
+                return (
+                  <View
+                    style={isNearEnd ? { marginLeft: -50 } : undefined}
+                    className="mb-2 items-center justify-center rounded-md bg-foreground px-2 py-1 shadow-lg"
+                  >
+                    <Text className="text-[10px] font-bold text-background">
+                      {item.day} · {formatDate(item.date)} · {item.value.toFixed(2)} kWh
+                    </Text>
+                    <Text className="text-[9px] text-muted">
+                      {item.costFormatted}
+                    </Text>
+                  </View>
+                );
+              }}
             />
           </ScrollView>
         ) : (
