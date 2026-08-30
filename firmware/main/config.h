@@ -10,7 +10,7 @@
 
 // Relay
 //#define RELAY_PIN 18
-#define RELAY_PIN 5
+#define RELAY_PIN 10
 
 // MQTT
 #define MQTT_BROKER_URI     "mqtts://53f627ab53774f0b9e7157bfe6b5490c.s1.eu.hivemq.cloud:8883"
@@ -25,6 +25,6 @@
 #define PRIORITY_WIFI_MONITOR 2
 #define PRIORITY_BUTTON  2
 
-#define BUTTON_PIN   10   
+#define BUTTON_PIN   5 
 
 #endif

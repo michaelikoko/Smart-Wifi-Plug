@@ -18,7 +18,7 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "com.michaelikoko.mobile"
+      "package": "com.michaelikoko.smartplug"
     },
     "web": {
       "output": "static",

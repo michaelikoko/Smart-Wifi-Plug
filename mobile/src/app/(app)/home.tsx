@@ -343,25 +343,29 @@ export default function HomeScreen() {
                   <Text className="text-2xl font-black text-foreground">{offlineCount}</Text>
                 </VStack>
 
-                <VStack className="flex-1 gap-1 rounded-xl border border-border bg-secondary p-3">
-                  <HStack className="items-center gap-1.5">
-                    <PlugZap size={14} color="#171717" />
-                    <Text className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                      Active
+                {
+                  /*  
+                  <VStack className="flex-1 gap-1 rounded-xl border border-border bg-secondary p-3">
+                    <HStack className="items-center gap-1.5">
+                      <PlugZap size={14} color="#171717" />
+                      <Text className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                        Active
+                      </Text>
+                    </HStack>
+                    <Text className="text-2xl font-black text-foreground">{activeRelayCount}</Text>
+                  </VStack>
+                  */
+                }
+                </HStack>
+
+                {onlineCount > 0 && (
+                  <HStack className="items-center justify-between rounded-xl border border-border bg-secondary px-4 py-3">
+                    <Text className="text-[13px] text-muted-foreground">Total Current Load</Text>
+                    <Text className="text-[15px] font-bold text-foreground">
+                      {totalLivePower.toFixed(1)} W
                     </Text>
                   </HStack>
-                  <Text className="text-2xl font-black text-foreground">{activeRelayCount}</Text>
-                </VStack>
-              </HStack>
-
-              {onlineCount > 0 && (
-                <HStack className="items-center justify-between rounded-xl border border-border bg-secondary px-4 py-3">
-                  <Text className="text-[13px] text-muted-foreground">Total Current Load</Text>
-                  <Text className="text-[15px] font-bold text-foreground">
-                    {totalLivePower.toFixed(1)} W
-                  </Text>
-                </HStack>
-              )}
+                )}
             </VStack>
           </Card>
         )}
