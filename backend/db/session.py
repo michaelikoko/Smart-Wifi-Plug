@@ -5,15 +5,15 @@ from fastapi import Depends
 from dotenv import load_dotenv
 import models
 
-load_dotenv()
+load_dotenv(override=True)
 #SQLITE_URL = os.getenv("SQLITE_URL") or "sqlite:///./database.db"
 POSTGRES_URL = os.getenv("POSTGRES_URL")
 if not POSTGRES_URL:
     raise ValueError("POSTGRES_URL environment variable is not set")
 
-connect_args = {"check_same_thread": False}
+#connect_args = {"check_same_thread": False}
 #engine = create_engine(SQLITE_URL, connect_args=connect_args)
-engine = create_engine(POSTGRES_URL, echo=False, pool_pre_ping=True, pool_recycle=3600)
+engine = create_engine(POSTGRES_URL, echo=False, pool_pre_ping=True, pool_recycle=3600, connect_args={"connect_timeout": 30})
 
 def create_db_and_tables():
     """

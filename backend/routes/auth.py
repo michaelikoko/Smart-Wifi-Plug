@@ -65,6 +65,62 @@ def _build_token_response(user: User, session: SessionDep) -> TokenResponse:
     return TokenResponse(access_token=access_token, refresh_token=refresh_token)
 
 
+#@router.post(
+#    "/register",
+#    response_model=UserResponse,
+#    status_code=status.HTTP_201_CREATED,
+#    summary="Create a new user account",
+#)
+#def register(body: RegisterRequest, session: SessionDep) -> User:
+#    """
+#    Register a new user account.
+#    New accounts start inactive (is_active=False) and must verify their
+#    email via OTP before they can log in.
+#
+#    If the email already belongs to an existing, unverified account, this
+#    resumes registration instead of blocking with a 409 — updates the
+#    account to the latest submitted name/password and issues a fresh OTP,
+#    rather than permanently trapping someone who closed the app before
+#    verifying. A 409 is only raised for an email that's already verified.
+#    """
+#    if body.password != body.confirm_password:
+#        raise HTTPException(
+#            status_code=status.HTTP_400_BAD_REQUEST,
+#            detail="Passwords do not match",
+#        )
+#    existing = session.exec(select(User).where(User.email == body.email)).first()
+#
+#    if existing is not None:
+#        if existing.is_active:
+#            raise HTTPException(
+#                status_code=status.HTTP_409_CONFLICT,
+#                detail="An account with this email already exists",
+#            )
+#        # Unverified account — resume registration with the latest details.
+#        existing.password_hash = get_password_hash(body.password)
+#        existing.full_name = body.full_name
+#        session.add(existing)
+#        session.commit()
+#        session.refresh(existing)
+#        user = existing
+#    else:
+#        password_hash = get_password_hash(body.password)
+#        user = User(
+#            email=body.email,
+#            password_hash=password_hash,
+#            full_name=body.full_name,
+#            is_active=False,
+#        )
+#        session.add(user)
+#        session.commit()
+#        session.refresh(user)
+#
+#    if user.id is not None:
+#        otp = issue_otp(session, user_id=user.id, purpose=OtpPurpose.EMAIL_VERIFICATION)
+#        send_otp_email(to=user.email, otp=otp, purpose=OtpPurpose.EMAIL_VERIFICATION)
+#
+#    return user
+
 @router.post(
     "/register",
     response_model=UserResponse,
@@ -74,14 +130,11 @@ def _build_token_response(user: User, session: SessionDep) -> TokenResponse:
 def register(body: RegisterRequest, session: SessionDep) -> User:
     """
     Register a new user account.
-    New accounts start inactive (is_active=False) and must verify their
-    email via OTP before they can log in.
 
-    If the email already belongs to an existing, unverified account, this
-    resumes registration instead of blocking with a 409 — updates the
-    account to the latest submitted name/password and issues a fresh OTP,
-    rather than permanently trapping someone who closed the app before
-    verifying. A 409 is only raised for an email that's already verified.
+    TEMPORARY: email verification is disabled. Accounts are created as
+    active immediately (is_active=True) and no OTP email is sent. Restore
+    the OTP flow (see git history / _build_token_response usage) once the
+    SMTP timeout issue is resolved.
     """
     if body.password != body.confirm_password:
         raise HTTPException(
@@ -99,6 +152,7 @@ def register(body: RegisterRequest, session: SessionDep) -> User:
         # Unverified account — resume registration with the latest details.
         existing.password_hash = get_password_hash(body.password)
         existing.full_name = body.full_name
+        existing.is_active = True
         session.add(existing)
         session.commit()
         session.refresh(existing)
@@ -109,17 +163,15 @@ def register(body: RegisterRequest, session: SessionDep) -> User:
             email=body.email,
             password_hash=password_hash,
             full_name=body.full_name,
-            is_active=False,
+            is_active=True,
         )
         session.add(user)
         session.commit()
         session.refresh(user)
 
-    if user.id is not None:
-        otp = issue_otp(session, user_id=user.id, purpose=OtpPurpose.EMAIL_VERIFICATION)
-        send_otp_email(to=user.email, otp=otp, purpose=OtpPurpose.EMAIL_VERIFICATION)
-
     return user
+
+
 
 @router.post(
     "/verify-email-otp",
