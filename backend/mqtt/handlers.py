@@ -15,7 +15,6 @@ import json
 from models.device import Device
 import re
 import asyncio
-import anyio
 import os
 
 logging.basicConfig(
@@ -196,11 +195,6 @@ def _save_telemetry_to_db(
     Resolves the timestamp from the payload.
     Saves the telemetry data to the database.
     Update the daily energy consumption for the device.
-
-    NOTE: This function performs blocking DB I/O and (via the _publish_*
-    helpers) synchronous MQTT publish calls. It must only ever be invoked
-    from a worker thread via anyio.to_thread.run_sync — never awaited or
-    called directly on the event loop.
     """
     try:
         device = session.exec(
@@ -349,8 +343,11 @@ def _save_telemetry_to_db(
 
             session.commit()
 
+            print("Checking events to publish")
+            print(new_events)
             for event in new_events:
                 session.refresh(event)  # Refresh to get the auto-generated ID and timestamps
+                print("Publishing events")
                 _publish_energy_event(device_id, event)
         else:
             session.commit() # commits when auto_cutoff_enabled is False
@@ -360,66 +357,6 @@ def _save_telemetry_to_db(
         logger.error("Error saving telemetry to DB: %s", e)
         session.rollback()
         raise
-
-
-def _handle_telemetry_db(telemetry: TelemetryPayload, device_id: str):
-    """Blocking DB work for a telemetry message. Runs in a worker thread."""
-    with Session(engine) as session:
-        _save_telemetry_to_db(telemetry, device_id, session)
-
-
-def _handle_status_db(device_id: str, is_online: bool):
-    """Blocking DB work for a status message. Runs in a worker thread."""
-    with Session(engine) as session:
-        device = session.exec(
-            select(Device)
-            .where(Device.device_id == device_id)
-            .where(Device.is_enabled == True)  # noqa: E712
-        ).first()
-        if device:
-            device.is_online = is_online
-            if is_online:
-                device.last_seen = datetime.now(timezone.utc)
-            session.add(device)
-            session.commit()
-
-            # Broadcast the online status to mobile clients
-            _publish_online_status(device_id, is_online)
-            logger.info(
-                "Device status updated — device=%s is_online=%s", device_id, is_online
-            )
-        else:
-            logger.warning(
-                "Status received for unregistered or disabled device: %s", device_id
-            )
-
-
-def _handle_relay_state_db(device_id: str, state: str):
-    """Blocking DB work for a relay-state message. Runs in a worker thread."""
-    with Session(engine) as session:
-        device = session.exec(
-            select(Device)
-            .where(Device.device_id == device_id)
-            .where(Device.is_enabled == True)  # noqa: E712
-        ).first()
-        if device:
-            device.relay_state = state == "ON"
-            device.is_online = (
-                True  # Device is online if we're receiving relay state updates
-            )
-            device.last_seen = datetime.now(timezone.utc)
-            session.add(device)
-            session.commit()
-
-            # Broadcast the online status to mobile clients
-            _publish_online_status(device_id, True)
-            logger.info(
-                "Relay state updated — device=%s state=%s", device_id, state
-            )
-        else:
-            logger.warning(
-                "Relay state received for unregistered or disabled device: %s", device_id
-            )
 
 
 def register_mqtt_handlers():
@@ -455,11 +392,9 @@ def register_mqtt_handlers():
             return
 
         try:
-            # Blocking DB work (queries, commit, and the _publish_* calls it
-            # triggers) is offloaded to a worker thread so it never blocks
-            # the event loop — critical now that DB round-trips go over the
-            # network to Aiven instead of localhost.
-            await anyio.to_thread.run_sync(_handle_telemetry_db, telemetry, device_id)
+            # session = next(get_session())
+            with Session(engine) as session:
+                _save_telemetry_to_db(telemetry, device_id, session)
         except Exception as e:
             logger.error("Database write error: %s", e)
 
@@ -497,7 +432,28 @@ def register_mqtt_handlers():
             return
 
         try:
-            await anyio.to_thread.run_sync(_handle_status_db, device_id, is_online)
+            with Session(engine) as session:
+                device = session.exec(
+                    select(Device)
+                    .where(Device.device_id == device_id)
+                    .where(Device.is_enabled == True)  # noqa: E712
+                ).first()
+                if device:
+                    device.is_online = is_online
+                    if is_online:
+                        device.last_seen = datetime.now(timezone.utc)
+                    session.add(device)
+                    session.commit()
+
+                    # Broadcast the online status to mobile clients
+                    _publish_online_status(device_id, is_online)
+                    logger.info(
+                        "Device status updated — device=%s is_online=%s", device_id, is_online
+                    )
+                else:
+                    logger.warning(
+                        "Status received for unregistered or disabled device: %s", device_id
+                    )
         except Exception as e:
             logger.error("Failed to update device status: %s", e)
 
@@ -527,86 +483,36 @@ def register_mqtt_handlers():
             return
 
         try:
-            await anyio.to_thread.run_sync(_handle_relay_state_db, device_id, state)
+            with Session(engine) as session:
+                device = session.exec(
+                    select(Device)
+                    .where(Device.device_id == device_id)
+                    .where(Device.is_enabled == True)  # noqa: E712
+                ).first()
+                if device:
+                    device.relay_state = state == "ON"
+                    device.is_online = (
+                        True  # Device is online if we're receiving relay state updates
+                    )
+                    device.last_seen = datetime.now(timezone.utc)
+                    session.add(device)
+                    session.commit()
+
+                    # Broadcast the online status to mobile clients
+                    _publish_online_status(device_id, True)
+                    logger.info(
+                        "Relay state updated — device=%s state=%s", device_id, state
+                    )
+                else:
+                    logger.warning(
+                        "Relay state received for unregistered or disabled device: %s", device_id
+                    )
         except Exception as e:
             logger.error("Failed to update relay state: %s", e)
 
     @fast_mqtt.on_disconnect()
     def on_disconnect(client: MQTTClient, packet, exc=None):
         logger.warning("MQTT disconnected — %s", exc)
-
-
-def _run_timer_sweep_db():
-    """Blocking DB work for one timer-sweep pass. Runs in a worker thread."""
-    now_local = datetime.now(LAGOS_TZ)
-    now_hhmm = now_local.strftime("%H:%M")
-    today_local = now_local.date()
-
-    with Session(engine) as session:
-        due_timers = session.exec(
-            select(DeviceTimer)
-            .where(DeviceTimer.is_enabled == True)  # noqa: E712
-            .where(DeviceTimer.time <= now_hhmm)
-            .where(
-                (col(DeviceTimer.last_triggered_date) == None)  # noqa: E711
-                | (col(DeviceTimer.last_triggered_date) != today_local)
-            )
-        ).all()
-
-        if not due_timers:
-            return
-
-        for timer in due_timers:
-            device = session.exec(
-                select(Device)
-                .where(Device.device_id == timer.device_id)
-                .where(Device.is_enabled == True)  # noqa: E712
-            ).first()
-
-            if not device:
-                # Orphaned timer (device soft-deleted/unclaimed) — mark
-                # as handled today so it doesn't retry every sweep.
-                timer.last_triggered_date = today_local
-                session.add(timer)
-                session.commit()
-                continue
-
-            relay_on = timer.action == "ON"
-            label = timer.name or f"Timer ({timer.time})"
-
-            if relay_on and device.cutoff_reason:
-                # Device is currently cut off for exceeding an energy
-                # limit — an ON timer must not override that. Leave
-                # last_triggered_date untouched so this timer stays
-                # "due" and is retried on the next sweep, firing as
-                # soon as the cutoff clears (or naturally rolling
-                # over to tomorrow if it never does).
-                logger.info(
-                    "Timer skipped — device=%s name=%s blocked by active cutoff (%s)",
-                    timer.device_id, label, device.cutoff_reason,
-                )
-                continue
-
-            _publish_relay_command(timer.device_id, relay_on)
-
-            reason = f"Turned {'ON' if relay_on else 'OFF'} by '{label}' at {timer.time}"
-            now_utc = datetime.now(timezone.utc)
-
-            device.timer_lock_reason = reason
-            device.timer_locked_at = now_utc
-            device.relay_state = relay_on
-            timer.last_triggered_date = today_local
-
-            session.add(device)
-            session.add(timer)
-            session.commit()
-
-            _publish_timer_lock(timer.device_id, True, reason, now_utc)
-
-            logger.info(
-                "Timer fired — device=%s action=%s name=%s",
-                timer.device_id, timer.action, label,
-            )
 
 
 async def start_timer_sweep():
@@ -627,47 +533,78 @@ async def start_timer_sweep():
     while True:
         await asyncio.sleep(TIMER_SWEEP_INTERVAL_S)
         try:
-            # All blocking DB work for this pass runs in a worker thread so
-            # a slow round trip to Aiven never stalls the event loop (and
-            # therefore never stalls HTTP requests or other MQTT handlers).
-            await anyio.to_thread.run_sync(_run_timer_sweep_db)
+            now_local = datetime.now(LAGOS_TZ)
+            now_hhmm = now_local.strftime("%H:%M")
+            today_local = now_local.date()
+
+            with Session(engine) as session:
+                due_timers = session.exec(
+                    select(DeviceTimer)
+                    .where(DeviceTimer.is_enabled == True)  # noqa: E712
+                    .where(DeviceTimer.time <= now_hhmm)
+                    .where(
+                        (col(DeviceTimer.last_triggered_date) == None)  # noqa: E711
+                        | (col(DeviceTimer.last_triggered_date) != today_local)
+                    )
+                ).all()
+
+                if not due_timers:
+                    continue
+
+                for timer in due_timers:
+                    device = session.exec(
+                        select(Device)
+                        .where(Device.device_id == timer.device_id)
+                        .where(Device.is_enabled == True)  # noqa: E712
+                    ).first()
+
+                    if not device:
+                        # Orphaned timer (device soft-deleted/unclaimed) — mark
+                        # as handled today so it doesn't retry every sweep.
+                        timer.last_triggered_date = today_local
+                        session.add(timer)
+                        session.commit()
+                        continue
+
+                    relay_on = timer.action == "ON"
+                    label = timer.name or f"Timer ({timer.time})"
+
+                    if relay_on and device.cutoff_reason:
+                        # Device is currently cut off for exceeding an energy
+                        # limit — an ON timer must not override that. Leave
+                        # last_triggered_date untouched so this timer stays
+                        # "due" and is retried on the next sweep, firing as
+                        # soon as the cutoff clears (or naturally rolling
+                        # over to tomorrow if it never does).
+                        logger.info(
+                            "Timer skipped — device=%s name=%s blocked by active cutoff (%s)",
+                            timer.device_id, label, device.cutoff_reason,
+                        )
+                        continue
+
+                    _publish_relay_command(timer.device_id, relay_on)
+
+                    reason = f"Turned {'ON' if relay_on else 'OFF'} by '{label}' at {timer.time}"
+                    now_utc = datetime.now(timezone.utc)
+
+                    device.timer_lock_reason = reason
+                    device.timer_locked_at = now_utc
+                    device.relay_state = relay_on
+                    timer.last_triggered_date = today_local
+
+                    session.add(device)
+                    session.add(timer)
+                    session.commit()
+
+                    _publish_timer_lock(timer.device_id, True, reason, now_utc)
+
+                    logger.info(
+                        "Timer fired — device=%s action=%s name=%s",
+                        timer.device_id, timer.action, label,
+                    )
+
         except Exception as e:
             logger.error("Timer sweep error: %s", e)
-
-
-def _run_staleness_sweep_db():
-    """Blocking DB work for one staleness-sweep pass. Runs in a worker thread."""
-    cutoff = datetime.now(timezone.utc).timestamp() - STALENESS_THRESHOLD_S
-    cutoff_dt = datetime.fromtimestamp(cutoff, tz=timezone.utc)
-
-    with Session(engine) as session:
-        stale_devices = session.exec(
-            select(Device)
-            .where(Device.is_online == True)  # noqa: E712
-            .where(Device.is_enabled == True)  # noqa: E712
-            .where(
-                (col(Device.last_seen) == None)  # noqa: E711
-                | (col(Device.last_seen) < cutoff_dt)
-            )
-        ).all()
-
-        if not stale_devices:
-            logger.info("No stale devices found in this sweep")
-            return
-
-        for device in stale_devices:
-            device.is_online = False
-            session.add(device)
-
-            # Broadcast the online status to mobile clients
-            _publish_online_status(device.device_id, False)
-            logger.info(
-                "Marking device offline (stale) — device=%s last_seen=%s",
-                device.device_id,
-                device.last_seen,
-            )
-
-        session.commit()
 
 
 async def start_staleness_sweep():
@@ -682,6 +619,38 @@ async def start_staleness_sweep():
     while True:
         await asyncio.sleep(STALENESS_SWEEP_INTERVAL_S)
         try:
-            await anyio.to_thread.run_sync(_run_staleness_sweep_db)
+            cutoff = datetime.now(timezone.utc).timestamp() - STALENESS_THRESHOLD_S
+            cutoff_dt = datetime.fromtimestamp(cutoff, tz=timezone.utc)
+
+            with Session(engine) as session:
+                stale_devices = session.exec(
+                    select(Device)
+                    .where(Device.is_online == True)  # noqa: E712
+                    .where(Device.is_enabled == True)  # noqa: E712
+                    .where(
+                        (col(Device.last_seen) == None)  # noqa: E711
+                        | (col(Device.last_seen) < cutoff_dt)
+                    )
+                ).all()
+
+                if not stale_devices:
+                    logger.info("No stale devices found in this sweep")
+                    continue
+
+                for device in stale_devices:
+                    device.is_online = False
+                    session.add(device)
+
+                    # Broadcast the online status to mobile clients
+                    _publish_online_status(device.device_id, False)
+                    logger.info(
+                        "Marking device offline (stale) — device=%s last_seen=%s",
+                        device.device_id,
+                        device.last_seen,
+                    )
+
+                if stale_devices:
+                    session.commit()
+
         except Exception as e:
             logger.error("Staleness sweep error: %s", e)
