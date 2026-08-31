@@ -15,6 +15,9 @@ const wifiChangeListeners = new Map<string, (payload: { status: 'success' | 'fai
 
 
 function getClient(): Promise<MqttClient> {
+  const MQTT_USERNAME = "hivemq.webclient.1786765038201"
+  const MQTT_PASSWORD = "HTzqmNUVYce1GDvB@ZZfvyoscyITSSbK"
+
   if (client?.connected) return Promise.resolve(client);
   if (connectPromise) return connectPromise;
 
@@ -23,8 +26,8 @@ function getClient(): Promise<MqttClient> {
       protocol: 'wss',
       hostname: '53f627ab53774f0b9e7157bfe6b5490c.s1.eu.hivemq.cloud',
       port: 8884,
-      username: process.env.EXPO_PUBLIC_MQTT_USERNAME,
-      password: process.env.EXPO_PUBLIC_MQTT_PASSWORD,
+      username: MQTT_USERNAME,
+      password: MQTT_PASSWORD,
       clientId: `smartplug-${Math.random().toString(16).slice(2, 10)}`,
       path: '/mqtt',
       clean: true,
