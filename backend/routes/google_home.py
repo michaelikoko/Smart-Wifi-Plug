@@ -92,6 +92,7 @@ def decode_google_auth_code(code: str) -> GoogleAuthCodePayload:
 
 @router.get("/authorize", response_class=HTMLResponse, include_in_schema=False)
 def authorize_form(
+    request: Request,
     client_id: str,
     redirect_uri: str,
     state: str,
@@ -105,11 +106,16 @@ def authorize_form(
     if client_id != GOOGLE_CLIENT_ID:
         raise HTTPException(status_code=400, detail="Unknown client_id")
 
+    # Use the request's own path rather than hardcoding "/google-smarthome/authorize" —
+    # this endpoint may be mounted under a prefix (e.g. /api/v1), and a
+    # hardcoded action would silently 404 on submit if that prefix changes.
+    form_action = request.url.path
+
     return f"""
     <html>
       <body style="font-family: sans-serif; max-width: 360px; margin: 60px auto;">
         <h2>Link your SmartPlug account</h2>
-        <form method="post" action="/google-smarthome/authorize">
+        <form method="post" action="{form_action}">
           <input type="hidden" name="redirect_uri" value="{redirect_uri}" />
           <input type="hidden" name="state" value="{state}" />
           <div style="margin-bottom: 12px;">
@@ -174,7 +180,7 @@ def token_exchange(
         payload = decode_google_auth_code(code)
         user_id = int(payload.sub)
         user = session.get(User, user_id)
-        if user is None or not user.is_active or user.id is None:
+        if user is None or not user.is_active:
             raise HTTPException(status_code=401, detail="invalid_grant")
 
         access_token = create_access_token(user_id=user.id, email=user.email)
