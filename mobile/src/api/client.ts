@@ -24,8 +24,8 @@ import axios, {
 import { useAuthStore } from '../store/auth-store';
 
 //const BASE_URL = 'http://10.226.208.30:8000/api/v1';
-//const BASE_URL = 'https://smart-wifi-socket.pxxlspace.cv/api/v1';
-const BASE_URL = 'https://smart-wifi-plug.onrender.com/api/v1';
+const BASE_URL = 'https://smart-wifi-socket.pxxlspace.cv/api/v1';
+//const BASE_URL = 'https://smart-wifi-plug.onrender.com/api/v1';
 //const BASE_URL = 'https://7287-105-119-35-32.ngrok-free.app/api/v1';
 
 const apiClient = axiosCreate({
