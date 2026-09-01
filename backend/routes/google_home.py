@@ -28,7 +28,9 @@ from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 import jwt
-from fastapi import APIRouter, Depends, Form, HTTPException, Request, status
+import base64
+
+from fastapi import APIRouter, Depends, Form, Header, HTTPException, Request, status
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jwt.exceptions import PyJWTError
@@ -159,17 +161,32 @@ def authorize_submit(
 def token_exchange(
     session: SessionDep,
     grant_type: str = Form(...),
-    client_id: str = Form(...),
-    client_secret: str = Form(...),
+    client_id: Optional[str] = Form(default=None),
+    client_secret: Optional[str] = Form(default=None),
     code: Optional[str] = Form(default=None),
     redirect_uri: Optional[str] = Form(default=None),
     refresh_token: Optional[str] = Form(default=None),
+    authorization: Optional[str] = Header(default=None),
 ) -> GoogleTokenResponse:
     """
     OAuth2 token endpoint. Handles both:
       - grant_type=authorization_code (initial linking)
       - grant_type=refresh_token (Google refreshing an expired access token)
+
+    Google may send client_id/client_secret either as form fields or as an
+    HTTP Basic Auth header (RFC 6749 section 2.3.1), depending on the
+    "transmit via HTTP basic auth header" setting in the Developer Console.
+    Support both so this works regardless of that setting.
     """
+    if authorization and authorization.lower().startswith("basic "):
+        try:
+            decoded = base64.b64decode(authorization[6:]).decode("utf-8")
+            header_client_id, header_client_secret = decoded.split(":", 1)
+            client_id = header_client_id
+            client_secret = header_client_secret
+        except Exception:
+            raise HTTPException(status_code=401, detail="invalid_client")
+
     if client_id != GOOGLE_CLIENT_ID or client_secret != GOOGLE_CLIENT_SECRET:
         raise HTTPException(status_code=401, detail="invalid_client")
 
@@ -180,7 +197,7 @@ def token_exchange(
         payload = decode_google_auth_code(code)
         user_id = int(payload.sub)
         user = session.get(User, user_id)
-        if user is None or not user.is_active:
+        if user is None or not user.is_active or user.id is None:
             raise HTTPException(status_code=401, detail="invalid_grant")
 
         access_token = create_access_token(user_id=user.id, email=user.email)
