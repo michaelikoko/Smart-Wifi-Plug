@@ -12,6 +12,7 @@ from routes.user import router as user_router
 from routes.devices import router as devices_router
 from routes.events import router as events_router
 from routes.timers import router as timers_router
+from routes.google_home import router as google_home_router
 
 # mqtt handlers
 from mqtt.handlers import fast_mqtt, register_mqtt_handlers, start_staleness_sweep, start_timer_sweep
@@ -57,6 +58,7 @@ app.include_router(user_router, prefix=URL_PREFIX)
 app.include_router(devices_router, prefix=URL_PREFIX)
 app.include_router(events_router, prefix=URL_PREFIX)
 app.include_router(timers_router, prefix=URL_PREFIX)
+app.include_router(google_home_router, prefix=URL_PREFIX)
 
 @app.get(URL_PREFIX + "/ping")
 def ping():
