@@ -33,3 +33,6 @@ archive.zip
 .codspeed
 *.db
 .venv-be/
+
+# Service Account JSON key
+smart-wifi-plug-test-*.json

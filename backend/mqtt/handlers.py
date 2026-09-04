@@ -16,6 +16,7 @@ from models.device import Device
 import re
 import asyncio
 import os
+from integrations.homegraph import report_state
 
 logging.basicConfig(
     level=logging.INFO,
@@ -188,6 +189,21 @@ def _get_date(ts_epoch: int) -> date_type:
     return datetime.fromtimestamp(ts_epoch, tz=timezone.utc).date()
 
 
+def _report_state_if_changed(device: Device, old_relay_state: bool, old_online: bool) -> None:
+    """
+    Push the device's current state to Google Home Graph, but only when
+    relay_state or is_online actually changed — avoids calling the API on
+    every telemetry message (every ~10s per device).
+    """
+    if device.relay_state != old_relay_state or device.is_online != old_online:
+        report_state(
+            agent_user_id=str(device.user_id),
+            device_id=device.device_id,
+            online=device.is_online,
+            on=device.relay_state,
+        )
+
+
 def _save_telemetry_to_db(
     payload: TelemetryPayload, device_id: str, session: SessionDep
 ):
@@ -207,6 +223,9 @@ def _save_telemetry_to_db(
             # Device not registered in the database, log a warning and return
             logger.warning("Telemetry received for unregistered or disabled device: %s", device_id)
             return
+
+        old_relay_state = device.relay_state
+        old_online = device.is_online
 
         resolved_ts_epoch = _resolve_timestamp(payload.ts)
         date = _get_date(resolved_ts_epoch)
@@ -353,6 +372,11 @@ def _save_telemetry_to_db(
             session.commit() # commits when auto_cutoff_enabled is False
         # --- End energy limit enforcement ---
 
+        # Push to Google Home Graph only if relay/online state actually
+        # changed this cycle (covers the payload.relay mirror above AND
+        # the auto-cutoff branch forcing relay_state=False).
+        _report_state_if_changed(device, old_relay_state, old_online)
+
     except Exception as e:
         logger.error("Error saving telemetry to DB: %s", e)
         session.rollback()
@@ -439,6 +463,9 @@ def register_mqtt_handlers():
                     .where(Device.is_enabled == True)  # noqa: E712
                 ).first()
                 if device:
+                    old_relay_state = device.relay_state
+                    old_online = device.is_online
+
                     device.is_online = is_online
                     if is_online:
                         device.last_seen = datetime.now(timezone.utc)
@@ -450,6 +477,8 @@ def register_mqtt_handlers():
                     logger.info(
                         "Device status updated — device=%s is_online=%s", device_id, is_online
                     )
+
+                    _report_state_if_changed(device, old_relay_state, old_online)
                 else:
                     logger.warning(
                         "Status received for unregistered or disabled device: %s", device_id
@@ -490,6 +519,9 @@ def register_mqtt_handlers():
                     .where(Device.is_enabled == True)  # noqa: E712
                 ).first()
                 if device:
+                    old_relay_state = device.relay_state
+                    old_online = device.is_online
+
                     device.relay_state = state == "ON"
                     device.is_online = (
                         True  # Device is online if we're receiving relay state updates
@@ -503,6 +535,8 @@ def register_mqtt_handlers():
                     logger.info(
                         "Relay state updated — device=%s state=%s", device_id, state
                     )
+
+                    _report_state_if_changed(device, old_relay_state, old_online)
                 else:
                     logger.warning(
                         "Relay state received for unregistered or disabled device: %s", device_id
@@ -566,6 +600,9 @@ async def start_timer_sweep():
                         session.commit()
                         continue
 
+                    old_relay_state = device.relay_state
+                    old_online = device.is_online
+
                     relay_on = timer.action == "ON"
                     label = timer.name or f"Timer ({timer.time})"
 
@@ -597,6 +634,8 @@ async def start_timer_sweep():
                     session.commit()
 
                     _publish_timer_lock(timer.device_id, True, reason, now_utc)
+
+                    _report_state_if_changed(device, old_relay_state, old_online)
 
                     logger.info(
                         "Timer fired — device=%s action=%s name=%s",
@@ -647,6 +686,14 @@ async def start_staleness_sweep():
                         "Marking device offline (stale) — device=%s last_seen=%s",
                         device.device_id,
                         device.last_seen,
+                    )
+
+                    # Device just transitioned online→offline — always report.
+                    report_state(
+                        agent_user_id=str(device.user_id),
+                        device_id=device.device_id,
+                        online=False,
+                        on=device.relay_state,
                     )
 
                 if stale_devices:

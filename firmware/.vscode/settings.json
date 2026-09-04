@@ -12,5 +12,6 @@
     "--query-driver=**",
     "--compile-commands-dir=/home/michaelikoko/Documents/Programming/smartplug/firmware/build"
   ],
-  "idf.port": "/dev/ttyACM0"
+  "idf.port": "/dev/ttyACM0",
+  "idf.flashType": "JTAG"
 }

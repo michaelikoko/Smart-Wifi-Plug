@@ -52,6 +52,7 @@ from models.user import User
 from schemas.google_home import GoogleAuthCodePayload, GoogleTokenResponse, FulfillmentRequest
 
 from mqtt.handlers import _publish_relay_command
+from integrations.homegraph import request_sync
 
 router = APIRouter(prefix="/google-smarthome", tags=["Google Smart Home"])
 
@@ -211,6 +212,10 @@ def token_exchange(
         )
         session.commit()
 
+        # Tell Google to fetch this user's devices right away, rather than
+        # waiting on its own schedule.
+        request_sync(agent_user_id=str(user.id))
+
         return GoogleTokenResponse(
             access_token=access_token,
             refresh_token=new_refresh_token,
@@ -281,7 +286,7 @@ def _device_to_google_sync(device: Device) -> dict:
 
 
 @router.post("/fulfillment")
-def fulfillment(
+async def fulfillment(
     request: FulfillmentRequest,
     session: SessionDep,
     token: HTTPAuthorizationCredentials = Depends(bearer_scheme),
